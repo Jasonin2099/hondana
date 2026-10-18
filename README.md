@@ -1,6 +1,9 @@
 # hondana 本棚
 
-[![license](https://img.shields.io/github/license/Jasonin2099/hondana?style=flat&color=555)](LICENSE) [![last commit](https://img.shields.io/github/last-commit/Jasonin2099/hondana?style=flat&color=555)](https://github.com/Jasonin2099/hondana/commits) [![stars](https://img.shields.io/github/stars/Jasonin2099/hondana?style=flat&color=555)](https://github.com/Jasonin2099/hondana/stargazers)
+[![stars](https://img.shields.io/github/stars/Jasonin2099/hondana?style=flat&label=stars&color=1D1D1F&logo=github)](https://github.com/Jasonin2099/hondana/stargazers)
+[![last commit](https://img.shields.io/github/last-commit/Jasonin2099/hondana?style=flat&label=last%20commit&color=1A7F37)](https://github.com/Jasonin2099/hondana/commits/main)
+[![license](https://img.shields.io/github/license/Jasonin2099/hondana?style=flat&label=license&color=6E6E73)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3C3C43?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 
 [English](README.en.md) · [日本語](README.ja.md)
 
