@@ -1,5 +1,7 @@
 # hondana 本棚
 
+[![license](https://img.shields.io/github/license/Jasonin2099/hondana?style=flat&color=555)](LICENSE) [![last commit](https://img.shields.io/github/last-commit/Jasonin2099/hondana?style=flat&color=555)](https://github.com/Jasonin2099/hondana/commits) [![stars](https://img.shields.io/github/stars/Jasonin2099/hondana?style=flat&color=555)](https://github.com/Jasonin2099/hondana/stargazers)
+
 [English](README.en.md) · [日本語](README.ja.md)
 
 给日文 / 中日文书目做「搜得到、对得上」的小工具。零依赖，纯 Python。
