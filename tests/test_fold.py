@@ -41,3 +41,27 @@ def test_empty():
 def test_reading_lines():
     assert strip_reading_lines("吾輩は猫である\nワガハイ ワ ネコ デ アル") == "吾輩は猫である"
     assert strip_reading_lines("A\n副題あり") == "A\n副題あり"
+
+
+KYU_BATCH_2 = "惠恵 榮栄 衞衛 鹽塩 歐欧 穩穏 擴拡 覺覚 勸勧 卷巻 歡歓 縣県 險険 權権 顯顕 嚴厳 處処 壽寿 從従 燒焼".split()
+
+
+@pytest.mark.parametrize("pair", KYU_BATCH_2)
+def test_kyujitai_batch_2(pair):
+    old, new = pair
+    assert to_shinjitai(old) == new
+    assert to_shinjitai(old, simplified=False) == new
+    assert fold(old) == fold(new)
+
+
+@pytest.mark.parametrize("a,b", [
+    ("歐洲史", "欧洲史"), ("權利", "権利"), ("縣史", "県史"), ("全卷", "全巻"),
+])
+def test_kyujitai_batch_2_words(a, b):
+    assert fold(a) == fold(b)
+
+
+def test_kyujitai_pairs_have_no_duplicate_keys():
+    from hondana._tables import _KYU
+    keys = [tok[0] for tok in _KYU.split()]
+    assert len(keys) == len(set(keys))

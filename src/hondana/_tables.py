@@ -15,7 +15,8 @@ purpose: folding them would merge records that are not the same book.
 _KYU = (
     "亞亜 惡悪 圍囲 爲為 醫医 驛駅 圓円 應応 櫻桜 假仮 價価 畫画 會会 學学 樂楽 關関 氣気 舊旧 區区 經経 "
     "藝芸 檢検 廣広 號号 國国 濟済 實実 寫写 圖図 數数 聲声 戰戦 對対 體体 臺台 鐵鉄 傳伝 讀読 發発 變変 "
-    "萬万 譯訳 藥薬 與与 來来 禮礼 歷歴 戀恋 灣湾 澤沢"
+    "萬万 譯訳 藥薬 與与 來来 禮礼 歷歴 戀恋 灣湾 澤沢 "
+    "惠恵 榮栄 衞衛 鹽塩 歐欧 穩穏 擴拡 覺覚 勸勧 卷巻 歡歓 縣県 險険 權権 顯顕 嚴厳 處処 壽寿 從従 燒焼"
 )
 
 # simplified Chinese -> shinjitai (only where it is not already shinjitai)
