@@ -65,3 +65,38 @@ def test_kyujitai_pairs_have_no_duplicate_keys():
     from hondana._tables import _KYU
     keys = [tok[0] for tok in _KYU.split()]
     assert len(keys) == len(set(keys))
+
+
+SIMP_BATCH_2 = "计計 认認 识識 诗詩 证証 乐楽 线線 纪紀 级級 红紅 绘絵 续続 统統 战戦 剧劇 场場 银銀 铁鉄 农農 岁歳".split()
+
+
+@pytest.mark.parametrize("pair", SIMP_BATCH_2)
+def test_simplified_batch_2(pair):
+    simp, new = pair
+    assert to_shinjitai(simp) == new
+    assert to_shinjitai(simp, kyujitai=False) == new
+    assert to_shinjitai(simp, simplified=False) == simp
+    assert fold(simp) == fold(new)
+
+
+@pytest.mark.parametrize("a,b", [
+    ("诗集", "詩集"), ("战争与和平", "戦争与和平"), ("银河铁道之夜", "銀河鉄道之夜"), ("续编", "続編"),
+])
+def test_simplified_batch_2_words(a, b):
+    assert fold(a) == fold(b)
+
+
+def test_simplified_exclusions_are_documented_and_not_folded():
+    from hondana._tables import SIMP_EXCLUDED, SIMP_TO_SHIN
+    for ch, why in SIMP_EXCLUDED.items():
+        assert why, ch
+        assert ch not in SIMP_TO_SHIN
+        assert to_shinjitai(ch) == ch
+
+
+def test_simplified_pairs_have_no_duplicate_or_identity_keys():
+    from hondana._tables import _SIMP
+    toks = _SIMP.split()
+    keys = [t[0] for t in toks]
+    assert len(keys) == len(set(keys))
+    assert all(len(t) == 2 and t[0] != t[1] for t in toks)

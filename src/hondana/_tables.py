@@ -8,7 +8,8 @@ welcome — please add a test case alongside.
 
 Some simplified characters are also ordinary Japanese characters with a
 different meaning (机 desk vs 機 machine, 干, 后, 叶, 征). Those are left out on
-purpose: folding them would merge records that are not the same book.
+purpose: folding them would merge records that are not the same book. They are
+listed in :data:`SIMP_EXCLUDED` so a future PR doesn't add them by accident.
 """
 
 # kyujitai / traditional -> shinjitai
@@ -22,9 +23,23 @@ _KYU = (
 # simplified Chinese -> shinjitai (only where it is not already shinjitai)
 _SIMP = (
     "书書 东東 车車 长長 门門 马馬 鱼魚 鸟鳥 语語 说説 话話 读読 记記 论論 历歴 华華 汉漢 业業 电電 图図 "
-    "馆館 为為 发発 经経 济済 对対 关関 时時 间間 问問 开開 题題 页頁 风風 见見 观観 现現 实実 写写 "
-    "门門 选選 编編 译訳 简簡 类類 杂雑"
+    "馆館 为為 发発 经経 济済 对対 关関 时時 间間 问問 开開 题題 页頁 风風 见見 观観 现現 实実 "
+    "选選 编編 译訳 简簡 类類 杂雑 "
+    "计計 认認 识識 诗詩 证証 乐楽 线線 纪紀 级級 红紅 绘絵 续続 统統 战戦 剧劇 场場 银銀 铁鉄 农農 岁歳"
 )
+
+# Simplified forms that must NOT be folded, because the same code point is an
+# ordinary Japanese character with its own meaning. Character -> why.
+SIMP_EXCLUDED = {
+    "机": "desk in Japanese; simplified for 機 (machine)",
+    "干": "dry/shield in Japanese; simplified for 乾 and 幹",
+    "后": "empress in Japanese; simplified for 後 (after)",
+    "叶": "to grant (かなう) in Japanese; simplified for 葉 (leaf)",
+    "征": "to conquer in Japanese; simplified for 徵/徴 (sign)",
+    "云": "to say (いう) in Japanese; simplified for 雲 (cloud)",
+    "芸": "arts in Japanese (shinjitai of 藝); simplified 芸 is a herb name",
+    "广": "a radical (まだれ) in Japanese; simplified for 廣/広",
+}
 
 
 def _pairs(s):
@@ -36,7 +51,7 @@ def _pairs(s):
 
 
 KYU_TO_SHIN = _pairs(_KYU)
-SIMP_TO_SHIN = _pairs(_SIMP)
+SIMP_TO_SHIN = {k: v for k, v in _pairs(_SIMP).items() if k not in SIMP_EXCLUDED}
 HAN_MAP = {**SIMP_TO_SHIN, **KYU_TO_SHIN}
 
 # iteration / variant marks that should vanish or be unified for matching
