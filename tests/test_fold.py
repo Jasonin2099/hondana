@@ -100,3 +100,23 @@ def test_simplified_pairs_have_no_duplicate_or_identity_keys():
     keys = [t[0] for t in toks]
     assert len(keys) == len(set(keys))
     assert all(len(t) == 2 and t[0] != t[1] for t in toks)
+
+
+@pytest.mark.parametrize("a,b", [
+    ("キャット", "キヤツト"), ("ちょっと", "ちよつと"), ("ファイル", "フアイル"),
+    ("霞ヶ関", "霞ケ関"), ("ｷｬｯﾄ", "きやつと"), ("くゎし", "くわし"),
+])
+def test_small_kana_option_folds(a, b):
+    assert fold(a, small_kana=True) == fold(b, small_kana=True)
+
+
+def test_small_kana_off_by_default():
+    assert fold("きって") != fold("きつて")
+    assert fold("キャット") == "きゃっと"
+
+
+def test_small_kana_with_kana_off_keeps_script():
+    from hondana.fold import fold_small_kana
+    assert fold("キャット", kana=False, small_kana=True) == "キヤツト"
+    assert fold_small_kana("ぁぃぅぇぉっゃゅょゎ") == "あいうえおつやゆよわ"
+    assert fold_small_kana("ABC 漢字") == "ABC 漢字"

@@ -10,12 +10,18 @@ import unicodedata
 
 from ._tables import EXTRA_FOLD, HAN_MAP, KYU_TO_SHIN, SIMP_TO_SHIN
 
-__all__ = ["fold", "kata_to_hira", "hira_to_kata", "to_shinjitai", "width", "strip_reading_lines"]
+__all__ = [
+    "fold", "kata_to_hira", "hira_to_kata", "to_shinjitai", "width", "strip_reading_lines", "fold_small_kana",
+]
 
 _HAN_TRANS = str.maketrans(HAN_MAP)
 _KYU_TRANS = str.maketrans(KYU_TO_SHIN)
 _SIMP_TRANS = str.maketrans(SIMP_TO_SHIN)
 _EXTRA_TRANS = str.maketrans(EXTRA_FOLD)
+_SMALL_KANA = str.maketrans(
+    "ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ",
+    "あいうえおつやゆよわかけアイウエオツヤユヨワカケ",
+)
 _SPACE_RE = re.compile(r"[\s\u3000]+")
 _PUNCT_RE = re.compile(r"[\s:：・･\-‐=＝,，、。.．!！?？'\"“”‘’()（）\[\]［］~]+")
 
@@ -32,6 +38,12 @@ def kata_to_hira(text: str) -> str:
 
 def hira_to_kata(text: str) -> str:
     return "".join(chr(ord(c) + 0x60) if "\u3041" <= c <= "\u3096" else c for c in text)
+
+
+def fold_small_kana(text: str) -> str:
+    """Small kana → full-size (ぁ→あ, っ→つ, ャ→ヤ, ヶ→ケ), for fuzzy matching
+    when one source writes 「キャット」 and another 「キヤツト」 (old-style catalogues)."""
+    return text.translate(_SMALL_KANA)
 
 
 def to_shinjitai(text: str, *, simplified: bool = True, kyujitai: bool = True) -> str:
@@ -53,6 +65,7 @@ def fold(
     long_vowel: bool = True,
     punctuation: bool = True,
     lower: bool = True,
+    small_kana: bool = False,
 ) -> str:
     """Return a key so that 「圖書館」「图书馆」「図書館」 compare equal, as do
     「ハリー・ポッター」「はりーぽったー」「ﾊﾘｰ ﾎﾟｯﾀｰ」 and 「ＡＢＣ」「abc」.
@@ -60,6 +73,12 @@ def fold(
     >>> fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")
     True
     >>> fold("圖書館") == fold("图书馆") == fold("図書館")
+    True
+
+    ``small_kana=True`` additionally folds small kana to full size (off by
+    default because it merges e.g. 「きって」 and 「きつて」):
+
+    >>> fold("キャット", small_kana=True) == fold("キヤツト", small_kana=True)
     True
     """
     if not text:
@@ -69,6 +88,8 @@ def fold(
         s = to_shinjitai(s)
     if kana:
         s = kata_to_hira(s)
+    if small_kana:
+        s = fold_small_kana(s)
     if lower:
         s = s.casefold()
     if long_vowel:
