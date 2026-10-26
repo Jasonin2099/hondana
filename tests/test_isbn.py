@@ -2,7 +2,6 @@ from hondana import is_valid, to_isbn13, to_isbn10, find_isbns
 
 
 def test_valid():
-    assert is_valid("978-4-10-101001-6") is False or True  # shape only
     assert is_valid("9784003101018")
     assert is_valid("4003101014")
     assert not is_valid("9784003101019")
@@ -25,3 +24,13 @@ def test_x_check_digit():
 def test_find():
     t = "ISBN 978-4-00-310101-8 と 4003101014、それに 1234567890"
     assert find_isbns(t) == ["9784003101018"]
+
+
+def test_find_without_spaces_and_with_labels():
+    for t in ["ISBN9784003101018", "ISBN-13:978-4-00-310101-8", "ISBN-10: 4-00-310101-4", "isbn4003101014", "(ISBN:4003101014)"]:
+        assert find_isbns(t) == ["9784003101018"], t
+
+
+def test_find_full_width_and_typographic_dashes():
+    for t in ["９７８４００３１０１０１８", "978‐4‐00‐310101‐8", "978–4–00–310101–8", "978−4−00−310101−8", "ＩＳＢＮ４－００－３１０１０１－４"]:
+        assert find_isbns(t) == ["9784003101018"], t

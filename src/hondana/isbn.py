@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 __all__ = ["clean", "is_valid", "to_isbn13", "to_isbn10", "find_isbns"]
 
@@ -55,10 +56,20 @@ def to_isbn10(raw: str | None) -> str:
 _FIND = re.compile(r"(?<![0-9])(97[89][\d\- ]{10,14}|[\d][\d\- ]{8,11}[\dXx])(?![0-9])")
 
 
+# Dashes that show up between ISBN groups in Japanese text and PDFs.
+_DASHES = str.maketrans(dict.fromkeys("‐‑‒–—―−", "-"))
+
+
 def find_isbns(text: str) -> list[str]:
-    """Pull every valid ISBN out of free text, normalised to ISBN-13, de-duplicated."""
+    """Pull every valid ISBN out of free text, normalised to ISBN-13, de-duplicated.
+
+    Full-width digits (「９７８－４…」) and typographic dashes (‐ – − …) are accepted:
+
+    >>> find_isbns("ＩＳＢＮ９７８－４－００－３１０１０１－８、ISBN-10:4003101014")
+    ['9784003101018']
+    """
     out: list[str] = []
-    for m in _FIND.finditer(text or ""):
+    for m in _FIND.finditer(unicodedata.normalize("NFKC", text or "").translate(_DASHES)):
         s = clean(m.group(1))
         if is_valid(s):
             i = to_isbn13(s)
