@@ -161,14 +161,26 @@ def lookup(
     fetch: Fetch = urllib_fetch,
     order: Iterable[str] = DEFAULT_ORDER,
     on_error: Optional[Callable[[str, BaseException], None]] = None,
+    timeouts: Optional["dict[str, float]"] = None,
 ) -> Optional[Book]:
-    """Look an ISBN up. Returns ``None`` for an invalid ISBN or when no source knows it."""
+    """Look an ISBN up. Returns ``None`` for an invalid ISBN or when no source knows it.
+
+    ``timeouts`` overrides the per-request timeout of some sources, in seconds
+    (defaults: NDL 15, the others 8), e.g. ``timeouts={"ndl": 30}``.
+    """
     isbn = to_isbn13(raw_isbn, strict=True)
     if not isbn:
         return None
+    unknown = set(timeouts or ()) - set(SOURCES)
+    if unknown:
+        raise ValueError(f"unknown source(s) in timeouts: {', '.join(sorted(unknown))}")
     for name in order:
+        f = fetch
+        if timeouts and name in timeouts:
+            t = timeouts[name]
+            f = lambda url, params, _timeout, t=t: fetch(url, params, t)  # noqa: E731
         try:
-            b = SOURCES[name](isbn, fetch)
+            b = SOURCES[name](isbn, f)
         except Exception as e:  # network, JSON, anything: next source
             if on_error:
                 on_error(name, e)

@@ -81,3 +81,17 @@ def test_cached_fetch_evicts_when_full():
     f("https://a/2", {}, 1)  # still cached
     f("https://a/0", {}, 1)  # oldest was dropped
     assert calls == ["https://a/0", "https://a/1", "https://a/2", "https://a/0"]
+
+
+def test_per_source_timeouts():
+    import pytest
+    seen = {}
+
+    def fetch(url, params, timeout):
+        seen[url.split("/")[2]] = timeout
+        return 404, ""
+
+    lookup(ISBN, fetch=fetch, timeouts={"ndl": 30, "google": 2})
+    assert seen == {"api.openbd.jp": 8, "ndlsearch.ndl.go.jp": 30, "www.googleapis.com": 2, "openlibrary.org": 8}
+    with pytest.raises(ValueError, match="ndI"):
+        lookup(ISBN, fetch=fetch, timeouts={"ndI": 30})

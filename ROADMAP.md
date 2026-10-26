@@ -11,7 +11,7 @@ Small steps, roughly one per day. Tick them off as they land.
 - [ ] ISBN: hyphenate ISBN-13 by registration group (start with 978-4 Japan)
 - [x] ISBN: `find_isbns()` should also catch "ISBN-10:" / "ISBN978…" without spaces, full-width digits and typographic dashes
 - [x] Lookup: optional simple in-memory TTL cache wrapper for `fetch` (`cached()`)
-- [ ] Lookup: per-source timeout overrides
+- [x] Lookup: per-source timeout overrides (`timeouts={"ndl": 30}`)
 - [ ] Lookup: return the raw source payload behind a flag for debugging
 - [ ] Lookup: add CiNii Books as an optional source
 - [ ] CLI: `hondana fold --explain` showing each step's output
