@@ -120,3 +120,27 @@ def test_small_kana_with_kana_off_keeps_script():
     assert fold("キャット", kana=False, small_kana=True) == "キヤツト"
     assert fold_small_kana("ぁぃぅぇぉっゃゅょゎ") == "あいうえおつやゆよわ"
     assert fold_small_kana("ABC 漢字") == "ABC 漢字"
+
+
+@pytest.mark.parametrize("src,expanded,dropped", [
+    ("時々", "時時", "時"), ("人々", "人人", "人"), ("いすゞ", "いすず", "いす"),
+    ("こゝろ", "こころ", "ころ"), ("みすゞ", "みすず", "みす"), ("ぶゝ", "ぶふ", "ぶ"),
+    ("バヽ", "バハ", "バ"), ("カヾミ", "カガミ", "カミ"), ("々頭", "頭", "頭"),
+])
+def test_fold_iteration_marks(src, expanded, dropped):
+    from hondana.fold import fold_iteration_marks
+    assert fold_iteration_marks(src) == expanded
+    assert fold_iteration_marks(src, "drop") == dropped
+
+
+def test_iteration_marks_in_fold():
+    assert fold("時々") == "時々"  # off by default
+    assert fold("時々", iteration_marks="expand") == fold("時時")
+    assert fold("こゝろ", iteration_marks="expand") == fold("こころ")
+    assert fold("佐々木", iteration_marks="drop") == fold("佐木")
+
+
+def test_iteration_marks_bad_mode():
+    from hondana.fold import fold_iteration_marks
+    with pytest.raises(ValueError):
+        fold_iteration_marks("時々", "keep")

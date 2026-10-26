@@ -12,6 +12,7 @@ from ._tables import EXTRA_FOLD, HAN_MAP, KYU_TO_SHIN, SIMP_TO_SHIN
 
 __all__ = [
     "fold", "kata_to_hira", "hira_to_kata", "to_shinjitai", "width", "strip_reading_lines", "fold_small_kana",
+    "fold_iteration_marks",
 ]
 
 _HAN_TRANS = str.maketrans(HAN_MAP)
@@ -46,6 +47,38 @@ def fold_small_kana(text: str) -> str:
     return text.translate(_SMALL_KANA)
 
 
+_KANA_MARKS = {"ゝ": False, "ゞ": True, "ヽ": False, "ヾ": True}
+
+
+def _voicing(c: str, voiced: bool) -> str:
+    """Return ``c`` with dakuten added (voiced) or removed (unvoiced), if possible."""
+    base = unicodedata.normalize("NFD", c)[0]
+    if not voiced:
+        return base
+    v = unicodedata.normalize("NFC", base + "\u3099")
+    return v if len(v) == 1 else base
+
+
+def fold_iteration_marks(text: str, mode: str = "expand") -> str:
+    """Handle iteration marks 々 ゝ ゞ ヽ ヾ.
+
+    ``mode="expand"`` repeats the previous character (「時々」→「時時」,
+    「いすゞ」→「いすず」, 「こゝろ」→「こころ」); ``mode="drop"`` removes them.
+    A mark with nothing before it is dropped in either mode.
+    """
+    if mode not in ("expand", "drop"):
+        raise ValueError(f"mode must be 'expand' or 'drop', not {mode!r}")
+    out: list[str] = []
+    for c in text:
+        if c == "々" or c in _KANA_MARKS:
+            if mode == "expand" and out and not out[-1].isspace():
+                prev = out[-1]
+                out.append(prev if c == "々" else _voicing(prev, _KANA_MARKS[c]))
+            continue
+        out.append(c)
+    return "".join(out)
+
+
 def to_shinjitai(text: str, *, simplified: bool = True, kyujitai: bool = True) -> str:
     """Map kyujitai / traditional and (optionally) simplified Chinese to shinjitai."""
     if simplified and kyujitai:
@@ -66,6 +99,7 @@ def fold(
     punctuation: bool = True,
     lower: bool = True,
     small_kana: bool = False,
+    iteration_marks: str | None = None,
 ) -> str:
     """Return a key so that 「圖書館」「图书馆」「図書館」 compare equal, as do
     「ハリー・ポッター」「はりーぽったー」「ﾊﾘｰ ﾎﾟｯﾀｰ」 and 「ＡＢＣ」「abc」.
@@ -80,10 +114,17 @@ def fold(
 
     >>> fold("キャット", small_kana=True) == fold("キヤツト", small_kana=True)
     True
+
+    ``iteration_marks="expand"`` or ``"drop"`` handles 々 ゝ ゞ (off by default):
+
+    >>> fold("いすゞ", iteration_marks="expand") == fold("いすず")
+    True
     """
     if not text:
         return ""
     s = width(text).translate(_EXTRA_TRANS)
+    if iteration_marks is not None:
+        s = fold_iteration_marks(s, iteration_marks)
     if han:
         s = to_shinjitai(s)
     if kana:
