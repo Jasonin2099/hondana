@@ -40,7 +40,7 @@ Every step can be switched off (`fold(s, kana=False)` etc.). Simplified characte
 
 ## ISBN lookup
 
-Each source is tried independently, so one timeout doesn't skip the rest. Pass your own `fetch(url, params, timeout) -> (status, text)` to use another HTTP client, add caching, or stub the network in tests.
+Each source is tried independently, so one timeout doesn't skip the rest. Pass your own `fetch(url, params, timeout) -> (status, text)` to use another HTTP client, add caching, or stub the network in tests. `cached(fetch, ttl=3600)` wraps any fetch with an in-memory TTL cache: `lookup(isbn, fetch=cached())`.
 
 ## Tests
 

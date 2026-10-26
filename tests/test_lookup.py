@@ -46,3 +46,38 @@ def test_invalid_and_missing():
     assert lookup(ISBN, fetch=fake({})) is None
 
 
+
+
+def test_cached_fetch_reuses_answers_until_ttl():
+    from hondana import cached
+    calls, now = [], [0.0]
+    f = cached(fake({"openbd": OBD}, calls), ttl=60, clock=lambda: now[0])
+    assert lookup(ISBN, fetch=f).source == "openBD"
+    assert lookup(ISBN, fetch=f).source == "openBD"
+    assert len(calls) == 1
+    now[0] = 61
+    lookup(ISBN, fetch=f)
+    assert len(calls) == 2
+
+
+def test_cached_fetch_keeps_404_but_not_errors():
+    from hondana import cached
+    calls = []
+    f = cached(fake({"ndl": (503, "")}, calls))
+    lookup(ISBN, fetch=f)
+    lookup(ISBN, fetch=f)
+    # openbd/google/openlibrary 404 → cached; ndl 503 → asked twice
+    assert sorted(set(calls)) == sorted(calls[:4]) and len(calls) == 5
+    assert sum("ndl" in c for c in calls) == 2
+
+
+def test_cached_fetch_evicts_when_full():
+    from hondana import cached
+    calls, now = [], [0.0]
+    f = cached(fake({"a": (200, "x")}, calls), ttl=100, maxsize=2, clock=lambda: now[0])
+    for i in range(3):
+        now[0] = i
+        f("https://a/%d" % i, {}, 1)
+    f("https://a/2", {}, 1)  # still cached
+    f("https://a/0", {}, 1)  # oldest was dropped
+    assert calls == ["https://a/0", "https://a/1", "https://a/2", "https://a/0"]

@@ -9,6 +9,8 @@ from __future__ import annotations
 import html
 import json
 import re
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -17,7 +19,7 @@ from typing import Callable, Iterable, Optional
 
 from .isbn import to_isbn13
 
-__all__ = ["Book", "lookup", "SOURCES", "Fetch", "urllib_fetch"]
+__all__ = ["Book", "lookup", "SOURCES", "Fetch", "urllib_fetch", "cached"]
 
 # fetch(url, params, timeout) -> (status_code, body_text)
 Fetch = Callable[[str, dict, float], "tuple[int, str]"]
@@ -33,6 +35,43 @@ def urllib_fetch(url: str, params: dict, timeout: float) -> "tuple[int, str]":
             return r.status, r.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return e.code, ""
+
+
+def cached(
+    fetch: Fetch = urllib_fetch,
+    *,
+    ttl: float = 3600,
+    maxsize: int = 512,
+    clock: Callable[[], float] = time.monotonic,
+) -> Fetch:
+    """Wrap ``fetch`` with a small in-memory TTL cache.
+
+    Only ``200`` and ``404`` answers are kept (a book that isn't there is worth
+    remembering too); errors and other statuses always go to the network again.
+    When full, the entry closest to expiry is dropped. Safe to share between threads.
+
+        lookup(isbn, fetch=cached(ttl=600))
+    """
+    store: "dict[tuple, tuple[float, tuple[int, str]]]" = {}
+    lock = threading.Lock()
+
+    def wrapped(url: str, params: dict, timeout: float) -> "tuple[int, str]":
+        key = (url, tuple(sorted((str(k), str(v)) for k, v in (params or {}).items())))
+        now = clock()
+        with lock:
+            hit = store.get(key)
+            if hit and hit[0] > now:
+                return hit[1]
+        res = fetch(url, params, timeout)
+        if res[0] in (200, 404):
+            with lock:
+                if len(store) >= maxsize and key not in store:
+                    for k in [k for k, (exp, _) in store.items() if exp <= now] or [min(store, key=lambda k: store[k][0])]:
+                        del store[k]
+                store[key] = (now + ttl, res)
+        return res
+
+    return wrapped
 
 
 @dataclass
@@ -123,9 +162,7 @@ def lookup(
     order: Iterable[str] = DEFAULT_ORDER,
     on_error: Optional[Callable[[str, BaseException], None]] = None,
 ) -> Optional[Book]:
-    """Look an ISBN up. Returns ``None`` for an invalid ISBN or when no source knows it.
-
-"""
+    """Look an ISBN up. Returns ``None`` for an invalid ISBN or when no source knows it."""
     isbn = to_isbn13(raw_isbn, strict=True)
     if not isbn:
         return None

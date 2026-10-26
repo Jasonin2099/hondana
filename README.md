@@ -52,7 +52,7 @@ python -m hondana isbn 9784003101018
 
 ## ISBN 查询
 
-`lookup()` 每个来源各自 try，一个超时不会连累后面。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。
+`lookup()` 每个来源各自 try，一个超时不会连累后面。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。
 
 ## 测试
 

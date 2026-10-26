@@ -40,6 +40,6 @@ CLI：`python -m hondana fold "ＡＢＣ　入門"` ／ `python -m hondana isbn 
 
 ## ISBN 検索
 
-ソースごとに独立して試すので、一つがタイムアウトしても残りは続行します。`fetch(url, params, timeout) -> (status, text)` を渡せば、HTTP クライアントの差し替え・キャッシュ・テスト用スタブが自由です。
+ソースごとに独立して試すので、一つがタイムアウトしても残りは続行します。`fetch(url, params, timeout) -> (status, text)` を渡せば、HTTP クライアントの差し替え・キャッシュ・テスト用スタブが自由です。メモリ上の簡易 TTL キャッシュは `lookup(isbn, fetch=cached(ttl=3600))` で使えます。
 
 ロードマップ：[ROADMAP.md](ROADMAP.md) ・ MIT License
