@@ -163,3 +163,19 @@ def test_voiced_mark_without_precomposed_form_is_kept():
     assert width("あ゛") == "あ゙"
     assert fold("あ゛") != fold("あ")
     assert width("A ゛").endswith(" ゙")  # not after kana: left alone
+
+
+def test_fold_steps_match_fold():
+    from hondana import fold_steps
+    for t in ["ﾊﾘｰ・ﾎﾟｯﾀｰ", "圖書館", "ＡＢＣ", "いすゞ"]:
+        for kw in [{}, {"small_kana": True, "iteration_marks": "expand"}, {"punctuation": False, "han": False}]:
+            assert fold_steps(t, **kw)[-1][1] == fold(t, **kw)
+    assert fold_steps("") == []
+
+
+def test_cli_explain(capsys):
+    from hondana.__main__ import main
+    assert main(["fold", "--explain", "--small-kana", "ﾊﾘｰ・ﾎﾟｯﾀｰ"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0].split()[0] == "input" and out[-1].split() == ["punctuation", "はりぽつた"]
+    assert any(l.startswith("small_kana") for l in out)

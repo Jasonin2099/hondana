@@ -14,7 +14,7 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] Lookup: per-source timeout overrides (`timeouts={"ndl": 30}`)
 - [ ] Lookup: return the raw source payload behind a flag for debugging
 - [ ] Lookup: add CiNii Books as an optional source
-- [ ] CLI: `hondana fold --explain` showing each step's output
+- [x] CLI: `hondana fold --explain` showing each step's output (`fold_steps()` in the API)
 - [ ] Type hints pass `mypy --strict`
 - [ ] Publish to PyPI (trusted publishing via GitHub Actions)
 - [ ] Docs: a short "why not just NFKC?" section with examples

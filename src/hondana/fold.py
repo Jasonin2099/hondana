@@ -12,7 +12,7 @@ from ._tables import EXTRA_FOLD, HAN_MAP, KYU_TO_SHIN, SIMP_TO_SHIN
 
 __all__ = [
     "fold", "kata_to_hira", "hira_to_kata", "to_shinjitai", "width", "strip_reading_lines", "fold_small_kana",
-    "fold_iteration_marks",
+    "fold_iteration_marks", "fold_steps",
 ]
 
 _HAN_TRANS = str.maketrans(HAN_MAP)
@@ -138,23 +138,58 @@ def fold(
     >>> fold("いすゞ", iteration_marks="expand") == fold("いすず")
     True
     """
+    steps = fold_steps(
+        text, kana=kana, han=han, long_vowel=long_vowel, punctuation=punctuation, lower=lower,
+        small_kana=small_kana, iteration_marks=iteration_marks,
+    )
+    return steps[-1][1] if steps else ""
+
+
+def fold_steps(
+    text: str | None,
+    *,
+    kana: bool = True,
+    han: bool = True,
+    long_vowel: bool = True,
+    punctuation: bool = True,
+    lower: bool = True,
+    small_kana: bool = False,
+    iteration_marks: str | None = None,
+) -> "list[tuple[str, str]]":
+    """Same options as :func:`fold`, but return ``(step, result)`` for every step
+    that ran, so you can see which one made two strings (not) match.
+
+    >>> [name for name, _ in fold_steps("ﾊﾘｰ・ﾎﾟｯﾀｰ")]
+    ['width', 'han', 'kana', 'lower', 'long_vowel', 'punctuation']
+    """
     if not text:
-        return ""
+        return []
+    out: list[tuple[str, str]] = []
     s = width(text).translate(_EXTRA_TRANS)
+    out.append(("width", s))
     if iteration_marks is not None:
         s = fold_iteration_marks(s, iteration_marks)
+        out.append(("iteration_marks", s))
     if han:
         s = to_shinjitai(s)
+        out.append(("han", s))
     if kana:
         s = kata_to_hira(s)
+        out.append(("kana", s))
     if small_kana:
         s = fold_small_kana(s)
+        out.append(("small_kana", s))
     if lower:
         s = s.casefold()
+        out.append(("lower", s))
     if long_vowel:
         s = s.replace("ー", "")
-    s = _PUNCT_RE.sub("", s) if punctuation else _SPACE_RE.sub(" ", s).strip()
-    return s
+        out.append(("long_vowel", s))
+    if punctuation:
+        out.append(("punctuation", _PUNCT_RE.sub("", s)))
+    else:
+        out.append(("spaces", _SPACE_RE.sub(" ", s).strip()))
+    return out
 
 
 _HAS_KANJI_OR_HIRA = re.compile(r"[\u3040-\u309f\u4e00-\u9fff]")

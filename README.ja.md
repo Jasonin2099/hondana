@@ -27,7 +27,7 @@ book = lookup("9784003101018")    # ネットワークに出ます。見つか�
 print(book.title, book.source)
 ```
 
-CLI：`python -m hondana fold "ＡＢＣ　入門"` ／ `python -m hondana isbn 9784003101018`
+CLI：`python -m hondana fold "ＡＢＣ　入門"` ／ `python -m hondana fold --explain "ﾊﾘｰ・ﾎﾟｯﾀｰ"`（各ステップを表示）／ `python -m hondana isbn 9784003101018`
 
 ## `fold()` の中身
 

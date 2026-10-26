@@ -36,6 +36,7 @@ print(book.title, book.source)
 
 ```bash
 python -m hondana fold "ＡＢＣ　入門"
+python -m hondana fold --explain "ﾊﾘｰ・ﾎﾟｯﾀｰ"   # 打印每一步的结果
 python -m hondana isbn 9784003101018
 ```
 
