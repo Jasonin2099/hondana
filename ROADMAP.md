@@ -17,4 +17,4 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] CLI: `hondana fold --explain` showing each step's output (`fold_steps()` in the API)
 - [ ] Type hints pass `mypy --strict`
 - [ ] Publish to PyPI (trusted publishing via GitHub Actions)
-- [ ] Docs: a short "why not just NFKC?" section with examples
+- [x] Docs: a short "why not just NFKC?" section with examples (docs/why-not-nfkc.md)

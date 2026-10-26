@@ -51,6 +51,8 @@ python -m hondana isbn 9784003101018
 
 有些简体字在日文里是另一个字（机 / 機、干、后、叶），故意没收进字表，免得把不同的书混在一起。
 
+为什么不直接用 NFKC：见 [docs/why-not-nfkc.md](docs/why-not-nfkc.md)（英文，附对照表）。
+
 ## ISBN 查询
 
 `lookup()` 每个来源各自 try，一个超时不会连累后面。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。

@@ -38,6 +38,8 @@ CLI: `python -m hondana fold "ＡＢＣ　入門"` · `python -m hondana fold --
 
 Every step can be switched off (`fold(s, kana=False)` etc.). Simplified characters that are a *different* everyday Japanese character (机 vs 機, 干, 后, 叶) are left out on purpose.
 
+Why not just NFKC? See [docs/why-not-nfkc.md](docs/why-not-nfkc.md).
+
 ## ISBN lookup
 
 Each source is tried independently, so one timeout doesn't skip the rest. Pass your own `fetch(url, params, timeout) -> (status, text)` to use another HTTP client, add caching, or stub the network in tests. `cached(fetch, ttl=3600)` wraps any fetch with an in-memory TTL cache: `lookup(isbn, fetch=cached())`.

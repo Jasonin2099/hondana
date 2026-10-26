@@ -38,6 +38,8 @@ CLI：`python -m hondana fold "ＡＢＣ　入門"` ／ `python -m hondana fold 
 
 各ステップは個別にオフにできます。机／機、干、后、叶 のように日本語では別の字になる簡体字は、別の本を混ぜないようあえて入れていません。
 
+NFKC だけでは足りない理由は [docs/why-not-nfkc.md](docs/why-not-nfkc.md)（英語・対照表つき）。
+
 ## ISBN 検索
 
 ソースごとに独立して試すので、一つがタイムアウトしても残りは続行します。`fetch(url, params, timeout) -> (status, text)` を渡せば、HTTP クライアントの差し替え・キャッシュ・テスト用スタブが自由です。メモリ上の簡易 TTL キャッシュは `lookup(isbn, fetch=cached(ttl=3600))` で使えます。

@@ -179,3 +179,23 @@ def test_cli_explain(capsys):
     out = capsys.readouterr().out.splitlines()
     assert out[0].split()[0] == "input" and out[-1].split() == ["punctuation", "はりぽつた"]
     assert any(l.startswith("small_kana") for l in out)
+
+
+@pytest.mark.parametrize("a,b,kw", [
+    ("圖書館", "図書館", {}),
+    ("图书馆", "図書館", {}),
+    ("ハリー・ポッター", "はりー ぽったー", {}),
+    ("ﾊﾘｰ ﾎﾟｯﾀｰ", "ハリー・ポッター", {}),
+    ("ＡＢＣ", "abc", {}),
+    ("か゛", "が", {}),
+    ("時々", "時時", {"iteration_marks": "expand"}),
+])
+def test_why_not_nfkc(a, b, kw):
+    """The table in docs/why-not-nfkc.md: NFKC alone misses these, fold() doesn't."""
+    import unicodedata
+    assert unicodedata.normalize("NFKC", a) != unicodedata.normalize("NFKC", b)
+    assert fold(a, **kw) == fold(b, **kw)
+
+
+def test_fold_is_a_key_not_display_text():
+    assert fold("コーヒー") == fold("コヒ")
