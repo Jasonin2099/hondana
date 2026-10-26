@@ -15,6 +15,6 @@ Small steps, roughly one per day. Tick them off as they land.
 - [ ] Lookup: return the raw source payload behind a flag for debugging
 - [ ] Lookup: add CiNii Books as an optional source
 - [x] CLI: `hondana fold --explain` showing each step's output (`fold_steps()` in the API)
-- [ ] Type hints pass `mypy --strict`
+- [x] Type hints pass `mypy --strict` (checked in CI)
 - [ ] Publish to PyPI (trusted publishing via GitHub Actions)
 - [x] Docs: a short "why not just NFKC?" section with examples (docs/why-not-nfkc.md)

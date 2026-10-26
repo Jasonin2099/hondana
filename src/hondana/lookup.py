@@ -15,19 +15,20 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass
-from typing import Callable, Iterable, Optional
+from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 from .isbn import to_isbn13
 
 __all__ = ["Book", "lookup", "SOURCES", "Fetch", "urllib_fetch", "cached"]
 
 # fetch(url, params, timeout) -> (status_code, body_text)
-Fetch = Callable[[str, dict, float], "tuple[int, str]"]
+Fetch = Callable[[str, Dict[str, Any], float], Tuple[int, str]]
+Source = Callable[[str, Fetch], "Optional[Book]"]
 
 USER_AGENT = "hondana (+https://github.com/Jasonin2099/hondana)"
 
 
-def urllib_fetch(url: str, params: dict, timeout: float) -> "tuple[int, str]":
+def urllib_fetch(url: str, params: "dict[str, Any]", timeout: float) -> "tuple[int, str]":
     q = url + ("?" + urllib.parse.urlencode(params) if params else "")
     req = urllib.request.Request(q, headers={"User-Agent": USER_AGENT})
     try:
@@ -52,10 +53,10 @@ def cached(
 
         lookup(isbn, fetch=cached(ttl=600))
     """
-    store: "dict[tuple, tuple[float, tuple[int, str]]]" = {}
+    store: "dict[tuple[str, tuple[tuple[str, str], ...]], tuple[float, tuple[int, str]]]" = {}
     lock = threading.Lock()
 
-    def wrapped(url: str, params: dict, timeout: float) -> "tuple[int, str]":
+    def wrapped(url: str, params: "dict[str, Any]", timeout: float) -> "tuple[int, str]":
         key = (url, tuple(sorted((str(k), str(v)) for k, v in (params or {}).items())))
         now = clock()
         with lock:
@@ -87,7 +88,7 @@ class Book:
     def __bool__(self) -> bool:
         return bool(self.title)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> "dict[str, str]":
         return asdict(self)
 
 
@@ -151,8 +152,12 @@ def _openlibrary(isbn: str, fetch: Fetch) -> Optional[Book]:
     )
 
 
-SOURCES: dict = {"openbd": _openbd, "ndl": _ndl, "google": _google, "openlibrary": _openlibrary}
+SOURCES: "dict[str, Source]" = {"openbd": _openbd, "ndl": _ndl, "google": _google, "openlibrary": _openlibrary}
 DEFAULT_ORDER = ("openbd", "ndl", "google", "openlibrary")
+
+
+def _with_timeout(fetch: Fetch, timeout: float) -> Fetch:
+    return lambda url, params, _ignored: fetch(url, params, timeout)
 
 
 def lookup(
@@ -175,10 +180,7 @@ def lookup(
     if unknown:
         raise ValueError(f"unknown source(s) in timeouts: {', '.join(sorted(unknown))}")
     for name in order:
-        f = fetch
-        if timeouts and name in timeouts:
-            t = timeouts[name]
-            f = lambda url, params, _timeout, t=t: fetch(url, params, t)  # noqa: E731
+        f = fetch if not timeouts or name not in timeouts else _with_timeout(fetch, timeouts[name])
         try:
             b = SOURCES[name](isbn, f)
         except Exception as e:  # network, JSON, anything: next source

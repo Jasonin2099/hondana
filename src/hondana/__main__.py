@@ -2,11 +2,12 @@
 import argparse
 import json
 import sys
+from typing import List, Optional
 
 from . import fold, fold_steps, lookup
 
 
-def main(argv=None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="hondana")
     sub = p.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("fold", help="print the matching key for some text")

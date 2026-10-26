@@ -42,8 +42,8 @@ SIMP_EXCLUDED = {
 }
 
 
-def _pairs(s):
-    out = {}
+def _pairs(s: str) -> "dict[str, str]":
+    out: "dict[str, str]" = {}
     for tok in s.split():
         if len(tok) == 2 and tok[0] != tok[1]:
             out[tok[0]] = tok[1]
