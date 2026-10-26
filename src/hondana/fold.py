@@ -27,9 +27,27 @@ _SPACE_RE = re.compile(r"[\s\u3000]+")
 _PUNCT_RE = re.compile(r"[\s:：・･\-‐=＝,，、。.．!！?？'\"“”‘’()（）\[\]［］~]+")
 
 
+# NFKC turns the spacing marks ゛ ゜ (U+309B/C) into a space + combining mark,
+# which then never joins the kana before it: 「か゛」 would stay two characters.
+_LOOSE_MARK_RE = re.compile(r"(?<=[ぁ-ヿ]) (?=[゙゚])")
+
+
 def width(text: str) -> str:
-    """Full-width ASCII → half-width, half-width katakana → full-width (NFKC)."""
-    return unicodedata.normalize("NFKC", text)
+    """Full-width ASCII → half-width, half-width katakana → full-width (NFKC).
+
+    Voiced / semi-voiced marks are joined to the kana before them, whether they
+    come as combining U+3099/U+309A or as the spacing 「゛」「゜」 some catalogues use:
+
+    >>> width("カ゛") == width("ガ") == width("ｶﾞ") == "ガ"
+    True
+
+    A mark that has no precomposed form with its kana (「あ゛」) is kept as a
+    combining mark.
+    """
+    s = unicodedata.normalize("NFKC", text)
+    if "゙" in s or "゚" in s:
+        s = unicodedata.normalize("NFC", _LOOSE_MARK_RE.sub("", s))
+    return s
 
 
 def kata_to_hira(text: str) -> str:

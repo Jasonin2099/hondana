@@ -1,5 +1,5 @@
 import pytest
-from hondana import fold, kata_to_hira, hira_to_kata, to_shinjitai, strip_reading_lines
+from hondana import fold, kata_to_hira, hira_to_kata, to_shinjitai, strip_reading_lines, width
 
 
 @pytest.mark.parametrize("a,b", [
@@ -144,3 +144,22 @@ def test_iteration_marks_bad_mode():
     from hondana.fold import fold_iteration_marks
     with pytest.raises(ValueError):
         fold_iteration_marks("時々", "keep")
+
+
+@pytest.mark.parametrize("a,b", [
+    ("が", "が"),          # combining voiced mark
+    ("か゛", "が"),              # spacing voiced mark
+    ("は゜", "ぱ"),              # spacing semi-voiced mark
+    ("パ", "パ"),
+    ("ウ゛ァイオリン", "ヴァイオリン"),
+    ("ｳﾞｧｲｵﾘﾝ", "ヴァイオリン"),
+    ("ト゛ラえもん", "ドラえもん"),
+])
+def test_voiced_marks_join_their_kana(a, b):
+    assert fold(a) == fold(b)
+
+
+def test_voiced_mark_without_precomposed_form_is_kept():
+    assert width("あ゛") == "あ゙"
+    assert fold("あ゛") != fold("あ")
+    assert width("A ゛").endswith(" ゙")  # not after kana: left alone
