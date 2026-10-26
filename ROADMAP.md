@@ -2,7 +2,7 @@
 
 Small steps, roughly one per day. Tick them off as they land.
 
-- [ ] Add GitHub Actions CI (test.yml is ready, needs a token with `workflow` scope)
+- [x] Add GitHub Actions CI (Python 3.9–3.14, Windows)
 - [x] Add 20 more kyujitai → shinjitai pairs (with tests)
 - [x] Add 20 more simplified → shinjitai pairs, keep the "different character" exclusion list documented
 - [x] `fold()`: option to fold small kana (ぁ→あ, っ→つ) for fuzzy matching
