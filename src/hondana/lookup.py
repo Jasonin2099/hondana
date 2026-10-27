@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 from .isbn import to_isbn13
@@ -84,12 +84,17 @@ class Book:
     year: str = ""
     cover: str = ""
     source: str = ""
+    #: The source's response body, only filled in by ``lookup(..., raw=True)``.
+    raw: Optional[str] = field(default=None, repr=False, compare=False)
 
     def __bool__(self) -> bool:
         return bool(self.title)
 
     def to_dict(self) -> "dict[str, str]":
-        return asdict(self)
+        d = asdict(self)
+        if d["raw"] is None:
+            del d["raw"]
+        return d
 
 
 def _https(u: str) -> str:
@@ -160,6 +165,15 @@ def _with_timeout(fetch: Fetch, timeout: float) -> Fetch:
     return lambda url, params, _ignored: fetch(url, params, timeout)
 
 
+def _recording(fetch: Fetch, sink: "list[str]") -> Fetch:
+    def f(url: str, params: "dict[str, Any]", timeout: float) -> "tuple[int, str]":
+        res = fetch(url, params, timeout)
+        sink.append(res[1])
+        return res
+
+    return f
+
+
 def lookup(
     raw_isbn: str,
     *,
@@ -167,11 +181,15 @@ def lookup(
     order: Iterable[str] = DEFAULT_ORDER,
     on_error: Optional[Callable[[str, BaseException], None]] = None,
     timeouts: Optional["dict[str, float]"] = None,
+    raw: bool = False,
 ) -> Optional[Book]:
     """Look an ISBN up. Returns ``None`` for an invalid ISBN or when no source knows it.
 
     ``timeouts`` overrides the per-request timeout of some sources, in seconds
     (defaults: NDL 15, the others 8), e.g. ``timeouts={"ndl": 30}``.
+
+    ``raw=True`` keeps the winning source's response body on ``Book.raw``, for
+    debugging a field that came out wrong. It is left out of ``to_dict()`` otherwise.
     """
     isbn = to_isbn13(raw_isbn, strict=True)
     if not isbn:
@@ -181,6 +199,9 @@ def lookup(
         raise ValueError(f"unknown source(s) in timeouts: {', '.join(sorted(unknown))}")
     for name in order:
         f = fetch if not timeouts or name not in timeouts else _with_timeout(fetch, timeouts[name])
+        last: "list[str]" = []
+        if raw:
+            f = _recording(f, last)
         try:
             b = SOURCES[name](isbn, f)
         except Exception as e:  # network, JSON, anything: next source
@@ -188,5 +209,7 @@ def lookup(
                 on_error(name, e)
             continue
         if b:
+            if raw and last:
+                b.raw = last[-1]
             return b
     return None

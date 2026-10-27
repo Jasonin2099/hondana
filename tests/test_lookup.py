@@ -95,3 +95,13 @@ def test_per_source_timeouts():
     assert seen == {"api.openbd.jp": 8, "ndlsearch.ndl.go.jp": 30, "www.googleapis.com": 2, "openlibrary.org": 8}
     with pytest.raises(ValueError, match="ndI"):
         lookup(ISBN, fetch=fetch, timeouts={"ndI": 30})
+
+
+def test_raw_payload_behind_flag():
+    b = lookup(ISBN, fetch=fake({"openbd": (200, "[null]"), "ndl": NDL}))
+    assert b.raw is None and "raw" not in b.to_dict()
+    b = lookup(ISBN, fetch=fake({"openbd": (200, "[null]"), "ndl": NDL}), raw=True)
+    assert b.source == "NDL" and b.raw == NDL[1]
+    assert b.to_dict()["raw"] == NDL[1]
+    assert "raw" not in repr(b)
+    assert b == lookup(ISBN, fetch=fake({"ndl": NDL}))

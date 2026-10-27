@@ -12,7 +12,7 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] ISBN: `find_isbns()` should also catch "ISBN-10:" / "ISBN978…" without spaces, full-width digits and typographic dashes
 - [x] Lookup: optional simple in-memory TTL cache wrapper for `fetch` (`cached()`)
 - [x] Lookup: per-source timeout overrides (`timeouts={"ndl": 30}`)
-- [ ] Lookup: return the raw source payload behind a flag for debugging
+- [x] Lookup: return the raw source payload behind a flag for debugging (`lookup(..., raw=True)` → `Book.raw`)
 - [ ] Lookup: add CiNii Books as an optional source
 - [x] CLI: `hondana fold --explain` showing each step's output (`fold_steps()` in the API)
 - [x] Type hints pass `mypy --strict` (checked in CI)
