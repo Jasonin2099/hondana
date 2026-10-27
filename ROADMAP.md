@@ -8,7 +8,7 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] `fold()`: option to fold small kana (ぁ→あ, っ→つ) for fuzzy matching
 - [x] `fold()`: fold iteration marks (々 ゝ ゞ) — expand or drop, configurable
 - [x] Handle voiced/semi-voiced combining marks (U+3099/U+309A) and spacing ゛ ゜ explicitly, with tests
-- [ ] ISBN: hyphenate ISBN-13 by registration group (start with 978-4 Japan)
+- [x] ISBN: hyphenate ISBN-13 by registration group (978-4 Japan done; other groups later)
 - [x] ISBN: `find_isbns()` should also catch "ISBN-10:" / "ISBN978…" without spaces, full-width digits and typographic dashes
 - [x] Lookup: optional simple in-memory TTL cache wrapper for `fetch` (`cached()`)
 - [x] Lookup: per-source timeout overrides (`timeouts={"ndl": 30}`)

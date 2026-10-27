@@ -17,11 +17,12 @@ pip install git+https://github.com/Jasonin2099/hondana
 ## 使い方
 
 ```python
-from hondana import fold, to_isbn13, lookup
+from hondana import fold, to_isbn13, hyphenate, lookup
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
 to_isbn13("4-00-310101-4")                           # '9784003101018'
+hyphenate("9784003101018")                           # '978-4-00-310101-8'（今は日本 978-4 のみ）
 
 book = lookup("9784003101018")    # ネットワークに出ます。見つからなければ None
 print(book.title, book.source)

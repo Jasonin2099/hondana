@@ -34,3 +34,24 @@ def test_find_without_spaces_and_with_labels():
 def test_find_full_width_and_typographic_dashes():
     for t in ["９７８４００３１０１０１８", "978‐4‐00‐310101‐8", "978–4–00–310101–8", "978−4−00−310101−8", "ＩＳＢＮ４－００－３１０１０１－４"]:
         assert find_isbns(t) == ["9784003101018"], t
+
+
+def test_hyphenate_japan_by_publisher_code_length():
+    from hondana import hyphenate
+    cases = {
+        "4003101014": "978-4-00-310101-8",        # 岩波書店 (2 digits)
+        "9784101010014": "978-4-10-101001-4",     # 新潮社
+        "9784774112343": "978-4-7741-1234-3",     # 技術評論社 (4 digits)
+        "9784873117782": "978-4-87311-778-2",     # オライリー・ジャパン (5 digits)
+        "9784901234566": "978-4-901234-56-6",     # 6 digits
+        "9784951234561": "978-4-9512345-6-1",     # 7 digits
+    }
+    for raw, want in cases.items():
+        assert hyphenate(raw) == want, raw
+
+
+def test_hyphenate_other_groups_and_invalid():
+    from hondana import hyphenate
+    assert hyphenate("9780804429573") == ""   # English-language group, not covered yet
+    assert hyphenate("9784003101019") == ""   # bad check digit
+    assert hyphenate("") == ""

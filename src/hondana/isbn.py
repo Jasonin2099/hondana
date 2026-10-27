@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-__all__ = ["clean", "is_valid", "to_isbn13", "to_isbn10", "find_isbns"]
+__all__ = ["clean", "is_valid", "to_isbn13", "to_isbn10", "find_isbns", "hyphenate"]
 
 _NON = re.compile(r"[^0-9Xx]")
 
@@ -76,3 +76,29 @@ def find_isbns(text: str) -> list[str]:
             if i not in out:
                 out.append(i)
     return out
+
+
+# Registrant (publisher) ranges for group 978-4 (Japan), from the ISBN International
+# range message: the first digits after "4" decide how long the publisher code is.
+_JP_RANGES = (("00", "19"), ("200", "699"), ("7000", "8499"), ("85000", "89999"), ("900000", "949999"), ("9500000", "9999999"))
+
+
+def hyphenate(raw: str | None) -> str:
+    """Hyphenate a Japanese ISBN-13 (978-4) by publisher code, e.g.
+    ``978-4-00-310101-8``. Returns ``""`` for invalid ISBNs and for other
+    groups, which aren't covered yet.
+
+    >>> hyphenate("4003101014")
+    '978-4-00-310101-8'
+    >>> hyphenate("9784873117782")
+    '978-4-87311-778-2'
+    """
+    s = to_isbn13(raw, strict=True)
+    if not s.startswith("9784"):
+        return ""
+    body = s[4:12]
+    for lo, hi in _JP_RANGES:
+        if lo <= body[: len(lo)] <= hi:
+            n = len(lo)
+            return f"978-4-{body[:n]}-{body[n:]}-{s[12]}"
+    return ""
