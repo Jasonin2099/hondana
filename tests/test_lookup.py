@@ -105,3 +105,29 @@ def test_raw_payload_behind_flag():
     assert b.to_dict()["raw"] == NDL[1]
     assert "raw" not in repr(b)
     assert b == lookup(ISBN, fetch=fake({"ndl": NDL}))
+
+
+CINII = (200, json.dumps({"@graph": [{"items": [{"title": "吾輩は猫である", "dc:creator": "夏目漱石 [著]", "dc:publisher": ["岩波書店"], "dc:date": "1990"}]}]}))
+
+
+def test_cinii_is_optional():
+    calls = []
+    assert lookup(ISBN, fetch=fake({"ci.nii": CINII}, calls)) is None
+    assert not any("ci.nii" in c for c in calls)
+
+
+def test_cinii_source(monkeypatch):
+    seen = []
+
+    def fetch(url, params, timeout):
+        seen.append(params)
+        return fake({"ci.nii": CINII})(url, params, timeout)
+
+    monkeypatch.setenv("HONDANA_CINII_APPID", "demo")
+    b = lookup(ISBN, fetch=fetch, order=("openbd", "cinii"))
+    assert b.source == "CiNii Books" and b.publisher == "岩波書店" and b.year == "1990"
+    assert seen[-1]["appid"] == "demo"
+
+
+def test_cinii_empty_graph():
+    assert lookup(ISBN, fetch=fake({"ci.nii": (200, json.dumps({"@graph": [{"items": []}]}))}), order=("cinii",)) is None

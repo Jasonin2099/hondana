@@ -13,7 +13,7 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] Lookup: optional simple in-memory TTL cache wrapper for `fetch` (`cached()`)
 - [x] Lookup: per-source timeout overrides (`timeouts={"ndl": 30}`)
 - [x] Lookup: return the raw source payload behind a flag for debugging (`lookup(..., raw=True)` → `Book.raw`)
-- [ ] Lookup: add CiNii Books as an optional source
+- [x] Lookup: add CiNii Books as an optional source
 - [x] CLI: `hondana fold --explain` showing each step's output (`fold_steps()` in the API)
 - [x] Type hints pass `mypy --strict` (checked in CI)
 - [ ] Publish to PyPI (trusted publishing via GitHub Actions)

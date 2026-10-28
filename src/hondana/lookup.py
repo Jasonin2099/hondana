@@ -1,5 +1,7 @@
 """ISBN lookup with source fallback: openBD → NDL Search → Google Books → Open Library.
 
+CiNii Books is available as an optional extra source (``order=(..., "cinii")``).
+
 Each source is tried on its own; one timing out never skips the rest. No
 third-party dependencies — pass your own ``fetch`` to use httpx/requests,
 add caching, or stub the network in tests.
@@ -8,6 +10,7 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import re
 import threading
 import time
@@ -157,7 +160,40 @@ def _openlibrary(isbn: str, fetch: Fetch) -> Optional[Book]:
     )
 
 
-SOURCES: "dict[str, Source]" = {"openbd": _openbd, "ndl": _ndl, "google": _google, "openlibrary": _openlibrary}
+def _first(v: Any) -> str:
+    if isinstance(v, list):
+        v = v[0] if v else ""
+    if isinstance(v, dict):
+        v = v.get("@value") or v.get("@id") or ""
+    return str(v or "").strip()
+
+
+def _cinii(isbn: str, fetch: Fetch) -> Optional[Book]:
+    """CiNii Books (university library holdings). Optional: not in the default order.
+
+    CiNii asks callers to register an application ID; set ``HONDANA_CINII_APPID``
+    to send one. Enable with ``lookup(isbn, order=(..., "cinii"))``.
+    """
+    params: "dict[str, Any]" = {"isbn": isbn, "format": "json", "count": 1}
+    appid = os.environ.get("HONDANA_CINII_APPID", "")
+    if appid:
+        params["appid"] = appid
+    st, body = fetch("https://ci.nii.ac.jp/books/opensearch/search", params, 10)
+    if st != 200:
+        return None
+    graph = json.loads(body or "{}").get("@graph") or [{}]
+    items = (graph[0] or {}).get("items") or []
+    if not items:
+        return None
+    it = items[0]
+    title = _first(it.get("title"))
+    if not title:
+        return None
+    year = (re.search(r"\d{4}", _first(it.get("dc:date"))) or [""])[0]
+    return Book(isbn, title, _first(it.get("dc:creator")), _first(it.get("dc:publisher")), year, "", "CiNii Books")
+
+
+SOURCES: "dict[str, Source]" = {"openbd": _openbd, "ndl": _ndl, "google": _google, "openlibrary": _openlibrary, "cinii": _cinii}
 DEFAULT_ORDER = ("openbd", "ndl", "google", "openlibrary")
 
 
@@ -186,7 +222,7 @@ def lookup(
     """Look an ISBN up. Returns ``None`` for an invalid ISBN or when no source knows it.
 
     ``timeouts`` overrides the per-request timeout of some sources, in seconds
-    (defaults: NDL 15, the others 8), e.g. ``timeouts={"ndl": 30}``.
+    (defaults: NDL 15, CiNii 10, the others 8), e.g. ``timeouts={"ndl": 30}``.
 
     ``raw=True`` keeps the winning source's response body on ``Book.raw``, for
     debugging a field that came out wrong. It is left out of ``to_dict()`` otherwise.
