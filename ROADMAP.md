@@ -18,3 +18,18 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] Type hints pass `mypy --strict` (checked in CI)
 - [ ] Publish to PyPI (trusted publishing via GitHub Actions)
 - [x] Docs: a short "why not just NFKC?" section with examples (docs/why-not-nfkc.md)
+
+## Next batch
+
+- [ ] Add 20 more kyujitai → shinjitai pairs common in names and places (澤→沢, 廣→広 …)
+- [ ] `fold()`: opt-in itaiji folding (髙→高, 﨑→崎 …)
+- [ ] `fold()`: opt-in unification of long-vowel marks, tildes and dash variants
+- [ ] `fold()`: katakana ⇄ hiragana as its own option
+- [ ] ISBN: hyphenation for English-language groups (978-0, 978-1)
+- [ ] ISBN: hyphenation for 978-7 and 978-986 / 978-957
+- [ ] ISBN: `to_isbn10()` / `to_isbn13()` conversion with check-digit validation
+- [ ] Lookup: merge results across sources, filling missing fields
+- [ ] Lookup: batch lookup for many ISBNs with built-in rate limiting
+- [ ] CLI: `hondana isbn` — find, validate and hyphenate ISBNs in text
+- [ ] CLI: `hondana lookup` with JSON or table output
+- [ ] Docs: practical recipes (cleaning a book list, reference lists in papers)
