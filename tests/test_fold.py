@@ -67,6 +67,24 @@ def test_kyujitai_pairs_have_no_duplicate_keys():
     assert len(keys) == len(set(keys))
 
 
+# batch 3: common in personal and place names
+KYU_BATCH_3 = "濱浜 邊辺 齋斎 齊斉 瀧滝 德徳 眞真 靜静 淺浅 豐豊 繩縄 驒騨 莊荘 彌弥 稻稲 澁渋 鄕郷 藏蔵 寶宝 黑黒".split()
+
+
+@pytest.mark.parametrize("pair", KYU_BATCH_3)
+def test_kyujitai_batch_3_names(pair):
+    old, new = pair
+    assert to_shinjitai(old) == new
+    assert fold(old) == fold(new)
+
+
+@pytest.mark.parametrize("a,b", [
+    ("濱田", "浜田"), ("渡邊", "渡辺"), ("齋藤", "斎藤"), ("飛驒", "飛騨"), ("澁谷", "渋谷"), ("黑田", "黒田"),
+])
+def test_kyujitai_batch_3_words(a, b):
+    assert fold(a) == fold(b)
+
+
 SIMP_BATCH_2 = "计計 认認 识識 诗詩 证証 乐楽 线線 纪紀 级級 红紅 绘絵 续続 统統 战戦 剧劇 场場 银銀 铁鉄 农農 岁歳".split()
 
 

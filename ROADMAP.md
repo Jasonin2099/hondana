@@ -21,7 +21,7 @@ Small steps, roughly one per day. Tick them off as they land.
 
 ## Next batch
 
-- [ ] Add 20 more kyujitai → shinjitai pairs common in names and places (澤→沢, 廣→広 …)
+- [x] Add 20 more kyujitai → shinjitai pairs common in names and places (澤→沢, 廣→広 …)
 - [ ] `fold()`: opt-in itaiji folding (髙→高, 﨑→崎 …)
 - [ ] `fold()`: opt-in unification of long-vowel marks, tildes and dash variants
 - [ ] `fold()`: katakana ⇄ hiragana as its own option
