@@ -34,7 +34,7 @@ CLI：`python -m hondana fold "ＡＢＣ　入門"` ／ `python -m hondana fold 
 
 1. NFKC（全角英数→半角、半角カナ→全角）
 2. 旧字体・繁体字・簡体字 → 新字体（`_tables.py` の小さな表）
-3. カタカナ→ひらがな、長音符 `ー` を除去（`small_kana=True` で ぁ→あ、っ→つ も畳む。`iteration_marks="expand"`/`"drop"` で 々 ゝ ゞ を展開・削除）
+3. カタカナ→ひらがな、長音符 `ー` を除去（`small_kana=True` で ぁ→あ、っ→つ も畳む。`iteration_marks="expand"`/`"drop"` で 々 ゝ ゞ を展開・削除。`itaiji=True` で人名に多い異体字 髙→高、﨑→崎 を畳む）
 4. 小文字化、空白・記号・「」『』を除去
 
 各ステップは個別にオフにできます。机／機、干、后、叶 のように日本語では別の字になる簡体字は、別の本を混ぜないようあえて入れていません。

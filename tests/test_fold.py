@@ -217,3 +217,18 @@ def test_why_not_nfkc(a, b, kw):
 
 def test_fold_is_a_key_not_display_text():
     assert fold("コーヒー") == fold("コヒ")
+
+
+@pytest.mark.parametrize("a,b", [("髙橋", "高橋"), ("山﨑", "山崎"), ("宮嵜", "宮崎"), ("𠮷田", "吉田"), ("渡邉", "渡辺")])
+def test_itaiji_opt_in(a, b):
+    assert fold(a) != fold(b)
+    assert fold(a, itaiji=True) == fold(b, itaiji=True) == fold(b)
+
+
+def test_itaiji_step_and_cli(capsys):
+    from hondana import fold_steps
+    from hondana.__main__ import main
+    assert "itaiji" in [n for n, _ in fold_steps("髙橋", itaiji=True)]
+    assert "itaiji" not in [n for n, _ in fold_steps("髙橋")]
+    assert main(["fold", "--itaiji", "髙橋"]) == 0
+    assert capsys.readouterr().out.strip() == fold("高橋")

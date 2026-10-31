@@ -1,4 +1,4 @@
-"""python -m hondana fold [--explain] [--small-kana] [--iteration-marks expand|drop] <text> | isbn <isbn>"""
+"""python -m hondana fold [--explain] [--small-kana] [--iteration-marks expand|drop] [--itaiji] <text> | isbn <isbn>"""
 import argparse
 import json
 import sys
@@ -15,11 +15,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     f.add_argument("--explain", action="store_true", help="print the result of every step")
     f.add_argument("--small-kana", action="store_true", help="also fold small kana (ぁ→あ, っ→つ)")
     f.add_argument("--iteration-marks", choices=("expand", "drop"), help="handle 々 ゝ ゞ")
+    f.add_argument("--itaiji", action="store_true", help="fold variant kanji in names (髙→高, 﨑→崎)")
     i = sub.add_parser("isbn", help="look an ISBN up (openBD → NDL → Google Books → Open Library)")
     i.add_argument("isbn")
     a = p.parse_args(argv)
     if a.cmd == "fold":
-        opts = {"small_kana": a.small_kana, "iteration_marks": a.iteration_marks}
+        opts = {"small_kana": a.small_kana, "iteration_marks": a.iteration_marks, "itaiji": a.itaiji}
         text = " ".join(a.text)
         if not a.explain:
             print(fold(text, **opts))

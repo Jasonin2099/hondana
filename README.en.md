@@ -34,7 +34,7 @@ CLI: `python -m hondana fold "ＡＢＣ　入門"` · `python -m hondana fold --
 
 1. NFKC (full-width ASCII → half, half-width kana → full)
 2. kyujitai / traditional / simplified → shinjitai (small table in `_tables.py`)
-3. katakana → hiragana, drop the long-vowel mark `ー` (opt-in: `small_kana=True` also folds ぁ→あ, っ→つ; `iteration_marks="expand"`/`"drop"` handles 々 ゝ ゞ)
+3. katakana → hiragana, drop the long-vowel mark `ー` (opt-in: `small_kana=True` also folds ぁ→あ, っ→つ; `iteration_marks="expand"`/`"drop"` handles 々 ゝ ゞ; `itaiji=True` folds variant kanji common in names, 髙→高, 﨑→崎)
 4. casefold, drop spaces, punctuation and 「」『』 brackets
 
 Every step can be switched off (`fold(s, kana=False)` etc.). Simplified characters that are a *different* everyday Japanese character (机 vs 機, 干, 后, 叶) are left out on purpose.

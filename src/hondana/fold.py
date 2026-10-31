@@ -8,17 +8,18 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from ._tables import EXTRA_FOLD, HAN_MAP, KYU_TO_SHIN, SIMP_TO_SHIN
+from ._tables import EXTRA_FOLD, HAN_MAP, ITAIJI, KYU_TO_SHIN, SIMP_TO_SHIN
 
 __all__ = [
     "fold", "kata_to_hira", "hira_to_kata", "to_shinjitai", "width", "strip_reading_lines", "fold_small_kana",
-    "fold_iteration_marks", "fold_steps",
+    "fold_iteration_marks", "fold_steps", "fold_itaiji",
 ]
 
 _HAN_TRANS = str.maketrans(HAN_MAP)
 _KYU_TRANS = str.maketrans(KYU_TO_SHIN)
 _SIMP_TRANS = str.maketrans(SIMP_TO_SHIN)
 _EXTRA_TRANS = str.maketrans(EXTRA_FOLD)
+_ITAIJI_TRANS = str.maketrans(ITAIJI)
 _SMALL_KANA = str.maketrans(
     "ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ",
     "あいうえおつやゆよわかけアイウエオツヤユヨワカケ",
@@ -63,6 +64,15 @@ def fold_small_kana(text: str) -> str:
     """Small kana → full-size (ぁ→あ, っ→つ, ャ→ヤ, ヶ→ケ), for fuzzy matching
     when one source writes 「キャット」 and another 「キヤツト」 (old-style catalogues)."""
     return text.translate(_SMALL_KANA)
+
+
+def fold_itaiji(text: str) -> str:
+    """Variant kanji common in names → standard form (髙→高, 﨑→崎, 𠮷→吉).
+
+    >>> fold_itaiji("髙橋") == "高橋"
+    True
+    """
+    return text.translate(_ITAIJI_TRANS)
 
 
 _KANA_MARKS = {"ゝ": False, "ゞ": True, "ヽ": False, "ヾ": True}
@@ -118,6 +128,7 @@ def fold(
     lower: bool = True,
     small_kana: bool = False,
     iteration_marks: str | None = None,
+    itaiji: bool = False,
 ) -> str:
     """Return a key so that 「圖書館」「图书馆」「図書館」 compare equal, as do
     「ハリー・ポッター」「はりーぽったー」「ﾊﾘｰ ﾎﾟｯﾀｰ」 and 「ＡＢＣ」「abc」.
@@ -137,10 +148,15 @@ def fold(
 
     >>> fold("いすゞ", iteration_marks="expand") == fold("いすず")
     True
+
+    ``itaiji=True`` folds variant kanji common in names (off by default):
+
+    >>> fold("髙橋", itaiji=True) == fold("高橋")
+    True
     """
     steps = fold_steps(
         text, kana=kana, han=han, long_vowel=long_vowel, punctuation=punctuation, lower=lower,
-        small_kana=small_kana, iteration_marks=iteration_marks,
+        small_kana=small_kana, iteration_marks=iteration_marks, itaiji=itaiji,
     )
     return steps[-1][1] if steps else ""
 
@@ -155,6 +171,7 @@ def fold_steps(
     lower: bool = True,
     small_kana: bool = False,
     iteration_marks: str | None = None,
+    itaiji: bool = False,
 ) -> "list[tuple[str, str]]":
     """Same options as :func:`fold`, but return ``(step, result)`` for every step
     that ran, so you can see which one made two strings (not) match.
@@ -170,6 +187,9 @@ def fold_steps(
     if iteration_marks is not None:
         s = fold_iteration_marks(s, iteration_marks)
         out.append(("iteration_marks", s))
+    if itaiji:
+        s = fold_itaiji(s)
+        out.append(("itaiji", s))
     if han:
         s = to_shinjitai(s)
         out.append(("han", s))

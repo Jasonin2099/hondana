@@ -55,6 +55,12 @@ KYU_TO_SHIN = _pairs(_KYU)
 SIMP_TO_SHIN = {k: v for k, v in _pairs(_SIMP).items() if k not in SIMP_EXCLUDED}
 HAN_MAP = {**SIMP_TO_SHIN, **KYU_TO_SHIN}
 
+# itaiji (variant forms) -> standard form, used only with fold(..., itaiji=True).
+# Mostly seen in personal and place names, where a catalogue may store either
+# form for the same person. Off by default: some people insist on the variant.
+_ITAIJI = "髙高 﨑崎 嵜崎 𠮷吉 邉辺 濵浜 栁柳 冨富"
+ITAIJI = _pairs(_ITAIJI)
+
 # iteration / variant marks that should vanish or be unified for matching
 EXTRA_FOLD = {
     "〜": "~", "～": "~", "―": "-", "‐": "-", "−": "-", "–": "-", "—": "-",
