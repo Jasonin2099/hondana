@@ -232,3 +232,29 @@ def test_itaiji_step_and_cli(capsys):
     assert "itaiji" not in [n for n, _ in fold_steps("髙橋")]
     assert main(["fold", "--itaiji", "髙橋"]) == 0
     assert capsys.readouterr().out.strip() == fold("高橋")
+
+
+@pytest.mark.parametrize("a,b", [
+    ("コ─ヒ─", "コーヒー"), ("コ━ヒ━", "コーヒー"), ("コ－ヒ－", "コーヒー"),
+    ("すご〜い", "すごーい"), ("すご～い", "すごーい"), ("ラ‐メン", "ラーメン"),
+])
+def test_dashes_opt_in(a, b):
+    assert fold(a, long_vowel=False) != fold(b, long_vowel=False)
+    assert fold(a, dashes=True, long_vowel=False) == fold(b, long_vowel=False)
+
+
+def test_fold_dashes_outside_kana():
+    from hondana.fold import fold_dashes
+    assert fold_dashes("1—2 ─ 3‑4") == "1-2 - 3-4"
+    assert fold_dashes("東京〜大阪 ∼ 京都") == "東京~大阪 ~ 京都"
+    assert fold_dashes("ー") == "ー"
+    assert fold_dashes("") == ""
+
+
+def test_dashes_step_and_cli(capsys):
+    from hondana import fold_steps
+    from hondana.__main__ import main
+    assert "dashes" in [n for n, _ in fold_steps("コ─ヒ─", dashes=True)]
+    assert "dashes" not in [n for n, _ in fold_steps("コ─ヒ─")]
+    assert main(["fold", "--dashes", "コ─ヒ─"]) == 0
+    assert capsys.readouterr().out.strip() == fold("コーヒー")

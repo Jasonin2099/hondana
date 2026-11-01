@@ -12,7 +12,7 @@ from ._tables import EXTRA_FOLD, HAN_MAP, ITAIJI, KYU_TO_SHIN, SIMP_TO_SHIN
 
 __all__ = [
     "fold", "kata_to_hira", "hira_to_kata", "to_shinjitai", "width", "strip_reading_lines", "fold_small_kana",
-    "fold_iteration_marks", "fold_steps", "fold_itaiji",
+    "fold_iteration_marks", "fold_steps", "fold_itaiji", "fold_dashes",
 ]
 
 _HAN_TRANS = str.maketrans(HAN_MAP)
@@ -75,6 +75,37 @@ def fold_itaiji(text: str) -> str:
     return text.translate(_ITAIJI_TRANS)
 
 
+# Dash-like and tilde-like characters seen in catalogue data. After kana they
+# are almost always a stand-in for the long-vowel mark (「コ─ヒ─」「すご〜い」).
+_DASHES = "-‐‑‒–—―−－─━﹣ｰ"
+_TILDES = "~〜～∼〰"
+_DASH_RE = re.compile(f"[{re.escape(_DASHES + _TILDES)}ー]")
+_KANA_BEFORE = re.compile(r"[ぁ-ゖァ-ヺー]")
+
+
+def fold_dashes(text: str) -> str:
+    """Unify long-vowel marks, tildes and dash variants.
+
+    Right after kana, any of them becomes 「ー」; elsewhere dashes become ``-``
+    and tildes ``~``:
+
+    >>> fold_dashes("コ─ヒ━")
+    'コーヒー'
+    >>> fold_dashes("1—2 〜 3")
+    '1-2 ~ 3'
+    """
+    def repl(m: "re.Match[str]") -> str:
+        c = m.group()
+        i = m.start()
+        if i and _KANA_BEFORE.match(text, i - 1):
+            return "ー"
+        if c == "ー":
+            return c
+        return "~" if c in _TILDES else "-"
+
+    return _DASH_RE.sub(repl, text)
+
+
 _KANA_MARKS = {"ゝ": False, "ゞ": True, "ヽ": False, "ヾ": True}
 
 
@@ -129,6 +160,7 @@ def fold(
     small_kana: bool = False,
     iteration_marks: str | None = None,
     itaiji: bool = False,
+    dashes: bool = False,
 ) -> str:
     """Return a key so that 「圖書館」「图书馆」「図書館」 compare equal, as do
     「ハリー・ポッター」「はりーぽったー」「ﾊﾘｰ ﾎﾟｯﾀｰ」 and 「ＡＢＣ」「abc」.
@@ -153,10 +185,16 @@ def fold(
 
     >>> fold("髙橋", itaiji=True) == fold("高橋")
     True
+
+    ``dashes=True`` unifies long-vowel marks, tildes and dash variants (off by
+    default); useful with ``long_vowel=False``:
+
+    >>> fold("コ─ヒ─", dashes=True, long_vowel=False) == fold("コーヒー", long_vowel=False)
+    True
     """
     steps = fold_steps(
         text, kana=kana, han=han, long_vowel=long_vowel, punctuation=punctuation, lower=lower,
-        small_kana=small_kana, iteration_marks=iteration_marks, itaiji=itaiji,
+        small_kana=small_kana, iteration_marks=iteration_marks, itaiji=itaiji, dashes=dashes,
     )
     return steps[-1][1] if steps else ""
 
@@ -172,6 +210,7 @@ def fold_steps(
     small_kana: bool = False,
     iteration_marks: str | None = None,
     itaiji: bool = False,
+    dashes: bool = False,
 ) -> "list[tuple[str, str]]":
     """Same options as :func:`fold`, but return ``(step, result)`` for every step
     that ran, so you can see which one made two strings (not) match.
@@ -184,6 +223,9 @@ def fold_steps(
     out: list[tuple[str, str]] = []
     s = width(text).translate(_EXTRA_TRANS)
     out.append(("width", s))
+    if dashes:
+        s = fold_dashes(s)
+        out.append(("dashes", s))
     if iteration_marks is not None:
         s = fold_iteration_marks(s, iteration_marks)
         out.append(("iteration_marks", s))
