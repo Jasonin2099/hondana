@@ -152,7 +152,7 @@ def to_shinjitai(text: str, *, simplified: bool = True, kyujitai: bool = True) -
 def fold(
     text: str | None,
     *,
-    kana: bool = True,
+    kana: "bool | str" = True,
     han: bool = True,
     long_vowel: bool = True,
     punctuation: bool = True,
@@ -175,6 +175,14 @@ def fold(
 
     >>> fold("キャット", small_kana=True) == fold("キヤツト", small_kana=True)
     True
+
+    ``kana`` picks the script kana are folded to: ``True``/``"hira"`` (default)
+    turns katakana into hiragana, ``"kata"`` turns hiragana into katakana
+    (handy when the key is shown to people used to katakana readings), and
+    ``False`` leaves both alone:
+
+    >>> fold("はりー ぽったー", kana="kata", long_vowel=False)
+    'ハリーポッター'
 
     ``iteration_marks="expand"`` or ``"drop"`` handles 々 ゝ ゞ (off by default):
 
@@ -202,7 +210,7 @@ def fold(
 def fold_steps(
     text: str | None,
     *,
-    kana: bool = True,
+    kana: "bool | str" = True,
     han: bool = True,
     long_vowel: bool = True,
     punctuation: bool = True,
@@ -218,6 +226,8 @@ def fold_steps(
     >>> [name for name, _ in fold_steps("ﾊﾘｰ・ﾎﾟｯﾀｰ")]
     ['width', 'han', 'kana', 'lower', 'long_vowel', 'punctuation']
     """
+    if kana not in (True, False, None, "hira", "kata"):
+        raise ValueError(f"kana must be True, False, 'hira' or 'kata', not {kana!r}")
     if not text:
         return []
     out: list[tuple[str, str]] = []
@@ -235,8 +245,11 @@ def fold_steps(
     if han:
         s = to_shinjitai(s)
         out.append(("han", s))
-    if kana:
+    if kana is True or kana == "hira":
         s = kata_to_hira(s)
+        out.append(("kana", s))
+    elif kana == "kata":
+        s = hira_to_kata(s)
         out.append(("kana", s))
     if small_kana:
         s = fold_small_kana(s)

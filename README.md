@@ -48,7 +48,7 @@ python -m hondana isbn 9784003101018
 3. 片假名→平假名，去掉长音 `ー`（可选 `small_kana=True`：小写假名 ぁ→あ、っ→つ；`iteration_marks="expand"`/`"drop"`：处理 々 ゝ ゞ；`itaiji=True`：人名常见异体字 髙→高、﨑→崎；`dashes=True`：统一长音符、波浪号和各种破折号，コ─ヒ─→コーヒー）
 4. 小写，去掉空格、标点和书名号
 
-每一步都能单独关掉，比如 `fold(s, kana=False)`。
+每一步都能单独关掉，比如 `fold(s, kana=False)`；`kana="kata"` 则反过来把平假名统一成片假名。
 
 有些简体字在日文里是另一个字（机 / 機、干、后、叶），故意没收进字表，免得把不同的书混在一起。
 

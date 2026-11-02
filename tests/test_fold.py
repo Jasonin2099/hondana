@@ -258,3 +258,21 @@ def test_dashes_step_and_cli(capsys):
     assert "dashes" not in [n for n, _ in fold_steps("コ─ヒ─")]
     assert main(["fold", "--dashes", "コ─ヒ─"]) == 0
     assert capsys.readouterr().out.strip() == fold("コーヒー")
+
+
+def test_kana_direction_option():
+    import pytest
+    assert fold("はりー", kana="kata", long_vowel=False) == "ハリー"
+    assert fold("ハリー", kana="hira", long_vowel=False) == fold("ハリー", long_vowel=False) == "はりー"
+    assert fold("ハリーはりー", kana="kata") == fold("はりーハリー", kana="kata") == "ハリハリ"
+    assert fold("ハリー", kana=False, long_vowel=False) == "ハリー"
+    with pytest.raises(ValueError):
+        fold("x", kana="romaji")
+
+
+def test_cli_kana_option(capsys):
+    from hondana.__main__ import main
+    assert main(["fold", "--kana", "kata", "はりー"]) == 0
+    assert capsys.readouterr().out.strip() == "ハリ"
+    assert main(["fold", "--kana", "off", "はりーハリー"]) == 0
+    assert capsys.readouterr().out.strip() == "はりハリ"

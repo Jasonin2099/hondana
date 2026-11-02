@@ -24,7 +24,7 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] Add 20 more kyujitai → shinjitai pairs common in names and places (澤→沢, 廣→広 …)
 - [x] `fold()`: opt-in itaiji folding (髙→高, 﨑→崎 …)
 - [x] `fold()`: opt-in unification of long-vowel marks, tildes and dash variants (`dashes=True`)
-- [ ] `fold()`: katakana ⇄ hiragana as its own option
+- [x] `fold()`: katakana ⇄ hiragana as its own option (`kana="hira"|"kata"|False`)
 - [ ] ISBN: hyphenation for English-language groups (978-0, 978-1)
 - [ ] ISBN: hyphenation for 978-7 and 978-986 / 978-957
 - [ ] ISBN: `to_isbn10()` / `to_isbn13()` conversion with check-digit validation
