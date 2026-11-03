@@ -78,27 +78,65 @@ def find_isbns(text: str) -> list[str]:
     return out
 
 
-# Registrant (publisher) ranges for group 978-4 (Japan), from the ISBN International
-# range message: the first digits after "4" decide how long the publisher code is.
-_JP_RANGES = (("00", "19"), ("200", "699"), ("7000", "8499"), ("85000", "89999"), ("900000", "949999"), ("9500000", "9999999"))
+# Registrant (publisher) ranges per registration group, transcribed from the ISBN
+# International range message (RangeMessage.xml, January 2026). Within a group the
+# first digits after the group number decide how long the registrant code is.
+# Unassigned gaps are left out, so ISBNs falling there are not hyphenated.
+_RANGE_TEXT = {
+    "0": (  # English language
+        "00-19,200-227,2280-2289,229-368,3690-3699,370-638,6390-6397,"
+        "6398000-6399999,640-644,6450000-6459999,646-647,6480000-6489999,649-654,"
+        "6550-6559,656-699,7000-8499,85000-89999,900000-900370,9003710-9003719,"
+        "900372-949999,9500000-9999999"
+    ),
+    "1": (  # English language
+        "000-009,01-02,030-034,0350-0399,040-047,0480-0499,05-05,0670000-0699999,"
+        "0700-0999,100-397,3980-5499,55000-64999,6500-6799,68000-68599,6860-7139,"
+        "714-716,7170-7319,7320000-7399999,74000-76199,7620-7634,7635000-7649999,"
+        "76500-77499,7750000-7753999,77540-77639,7764000-7764999,77650-77699,"
+        "7770000-7782999,77830-78999,7900-7999,80000-80049,80050-80499,"
+        "80500-83799,8380000-8384999,83850-86719,8672-8675,86760-86979,"
+        "869800-915999,9160000-9165059,916506-916869,9168700-9169079,"
+        "916908-919163,9191640-9195649,919565-919599,9196000-9196549,"
+        "919655-972999,9730-9877,987800-991149,9911500-9911999,991200-998989,"
+        "9989900-9999999"
+    ),
+    "4": (  # Japan
+        "00-19,200-699,7000-8499,85000-89999,900000-949999,9500000-9999999"
+    ),
+}
+
+
+def _parse_ranges(text: str) -> tuple[tuple[str, str], ...]:
+    pairs = (r.split("-") for r in text.split(","))
+    return tuple((lo, hi) for lo, hi in pairs)
+
+
+_RANGES = {g: _parse_ranges(t) for g, t in _RANGE_TEXT.items()}
 
 
 def hyphenate(raw: str | None) -> str:
-    """Hyphenate a Japanese ISBN-13 (978-4) by publisher code, e.g.
-    ``978-4-00-310101-8``. Returns ``""`` for invalid ISBNs and for other
-    groups, which aren't covered yet.
+    """Hyphenate an ISBN-13 by registration group and registrant code, e.g.
+    ``978-4-00-310101-8``. Covers 978-0 / 978-1 (English language) and 978-4
+    (Japan). Returns ``""`` for invalid ISBNs, other groups and unassigned ranges.
 
     >>> hyphenate("4003101014")
     '978-4-00-310101-8'
     >>> hyphenate("9784873117782")
     '978-4-87311-778-2'
+    >>> hyphenate("0131103628")
+    '978-0-13-110362-7'
     """
     s = to_isbn13(raw, strict=True)
-    if not s.startswith("9784"):
+    if not s.startswith("978"):
+        return ""
+    group = s[3]
+    ranges = _RANGES.get(group)
+    if ranges is None:
         return ""
     body = s[4:12]
-    for lo, hi in _JP_RANGES:
+    for lo, hi in ranges:
         if lo <= body[: len(lo)] <= hi:
             n = len(lo)
-            return f"978-4-{body[:n]}-{body[n:]}-{s[12]}"
+            return f"978-{group}-{body[:n]}-{body[n:]}-{s[12]}"
     return ""

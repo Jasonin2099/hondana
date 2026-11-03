@@ -50,8 +50,22 @@ def test_hyphenate_japan_by_publisher_code_length():
         assert hyphenate(raw) == want, raw
 
 
+def test_hyphenate_english_language_groups():
+    from hondana import hyphenate
+    cases = {
+        "0131103628": "978-0-13-110362-7",        # 2-digit registrant
+        "9780006479888": "978-0-00-647988-8",
+        "9780804429573": "978-0-8044-2957-3",     # 4 digits
+        "9781491946008": "978-1-4919-4600-8",     # 978-1, 4 digits
+        "9781593279288": "978-1-59327-928-8",     # 978-1, 5 digits
+    }
+    for raw, want in cases.items():
+        assert hyphenate(raw) == want, raw
+
+
 def test_hyphenate_other_groups_and_invalid():
     from hondana import hyphenate
-    assert hyphenate("9780804429573") == ""   # English-language group, not covered yet
+    assert hyphenate("9787020002207") == ""   # 978-7 not covered yet
+    assert hyphenate("9791032300824") == ""   # 979 prefix not covered
     assert hyphenate("9784003101019") == ""   # bad check digit
     assert hyphenate("") == ""
