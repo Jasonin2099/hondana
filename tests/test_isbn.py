@@ -63,9 +63,29 @@ def test_hyphenate_english_language_groups():
         assert hyphenate(raw) == want, raw
 
 
+def test_hyphenate_chinese_groups():
+    from hondana import hyphenate
+    cases = {
+        "9787020002207": "978-7-02-000220-7",     # 978-7, 2-digit registrant
+        "9787100000000": "978-7-100-00000-0",     # 3 digits
+        "9787500000006": "978-7-5000-0000-6",     # 4 digits
+        "9787800000003": "978-7-80000-000-3",     # 5 digits
+        "9787900000002": "978-7-900000-00-2",     # 6 digits
+        "9789570000009": "978-957-00-0000-9",     # Taiwan 957
+        "9789574400003": "978-957-440-000-3",
+        "9789579700009": "978-957-97000-0-9",
+        "9789860000009": "978-986-00-0000-9",     # Taiwan 986
+        "9789860600001": "978-986-06000-0-1",
+        "9789861200002": "978-986-120-000-2",
+        "9789868000001": "978-986-80000-0-1",
+    }
+    for raw, want in cases.items():
+        assert hyphenate(raw) == want, raw
+
+
 def test_hyphenate_other_groups_and_invalid():
     from hondana import hyphenate
-    assert hyphenate("9787020002207") == ""   # 978-7 not covered yet
+    assert hyphenate("9783161484100") == ""   # 978-3 (German) not covered
     assert hyphenate("9791032300824") == ""   # 979 prefix not covered
     assert hyphenate("9784003101019") == ""   # bad check digit
     assert hyphenate("") == ""

@@ -79,8 +79,8 @@ def find_isbns(text: str) -> list[str]:
 
 
 # Registrant (publisher) ranges per registration group, transcribed from the ISBN
-# International range message (RangeMessage.xml, January 2026). Within a group the
-# first digits after the group number decide how long the registrant code is.
+# International range message (RangeMessage.xml; the China/Taiwan groups were
+# cross-checked against isbnlib's copy). Within a group the first digits after the group number decide how long the registrant code is.
 # Unassigned gaps are left out, so ISBNs falling there are not hyphenated.
 _RANGE_TEXT = {
     "0": (  # English language
@@ -104,6 +104,16 @@ _RANGE_TEXT = {
     "4": (  # Japan
         "00-19,200-699,7000-8499,85000-89999,900000-949999,9500000-9999999"
     ),
+    "7": (  # China (mainland)
+        "00-09,100-499,5000-7999,80000-89999,900000-999999"
+    ),
+    "957": (  # Taiwan
+        "00-02,0300-0499,05-19,2000-2099,21-27,28000-30999,31-43,440-819,"
+        "8200-9699,97000-99999"
+    ),
+    "986": (  # Taiwan
+        "00-05,06000-06999,0700-0799,08-11,120-539,5400-7999,80000-99999"
+    ),
 }
 
 
@@ -117,8 +127,9 @@ _RANGES = {g: _parse_ranges(t) for g, t in _RANGE_TEXT.items()}
 
 def hyphenate(raw: str | None) -> str:
     """Hyphenate an ISBN-13 by registration group and registrant code, e.g.
-    ``978-4-00-310101-8``. Covers 978-0 / 978-1 (English language) and 978-4
-    (Japan). Returns ``""`` for invalid ISBNs, other groups and unassigned ranges.
+    ``978-4-00-310101-8``. Covers 978-0 / 978-1 (English language), 978-4
+    (Japan), 978-7 (China) and 978-957 / 978-986 (Taiwan). Returns ``""`` for
+    invalid ISBNs, other groups and unassigned ranges.
 
     >>> hyphenate("4003101014")
     '978-4-00-310101-8'
@@ -126,15 +137,18 @@ def hyphenate(raw: str | None) -> str:
     '978-4-87311-778-2'
     >>> hyphenate("0131103628")
     '978-0-13-110362-7'
+    >>> hyphenate("9787020002207")
+    '978-7-02-000220-7'
     """
     s = to_isbn13(raw, strict=True)
     if not s.startswith("978"):
         return ""
-    group = s[3]
-    ranges = _RANGES.get(group)
-    if ranges is None:
+    # Group codes are prefix-free, so at most one of these matches.
+    group = next((g for g in _RANGES if s[3:].startswith(g)), None)
+    if group is None:
         return ""
-    body = s[4:12]
+    ranges = _RANGES[group]
+    body = s[3 + len(group):12]
     for lo, hi in ranges:
         if lo <= body[: len(lo)] <= hi:
             n = len(lo)

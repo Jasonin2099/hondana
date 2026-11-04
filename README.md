@@ -27,7 +27,7 @@ from hondana import fold, to_isbn13, hyphenate, lookup
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
 to_isbn13("4-00-310101-4")                           # '9784003101018'
-hyphenate("9784003101018")                           # '978-4-00-310101-8'（支持日本 978-4 和英语区 978-0 / 978-1）
+hyphenate("9784003101018")                           # '978-4-00-310101-8'（支持日本 978-4、英语区 978-0 / 978-1、中国 978-7、台湾 978-957 / 978-986）
 
 book = lookup("9784003101018")    # 走网络；查不到返回 None
 print(book.title, book.source)
