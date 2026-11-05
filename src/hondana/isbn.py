@@ -32,8 +32,19 @@ def is_valid(raw: str | None) -> bool:
 
 
 def to_isbn13(raw: str | None, *, strict: bool = False) -> str:
-    """Return the ISBN-13 form, or ``""``. With ``strict=False`` a wrong check
-    digit is repaired (catalogue data has typos); with ``strict=True`` it is rejected."""
+    """Return the ISBN-13 form, or ``""``.
+
+    ISBN-10 input is prefixed with ``978``. With ``strict=False`` (default) a
+    wrong check digit is repaired — catalogue data often has typos; with
+    ``strict=True`` it is rejected.
+
+    >>> to_isbn13("4-00-310101-4")
+    '9784003101018'
+    >>> to_isbn13("9784003101019")          # repaired
+    '9784003101018'
+    >>> to_isbn13("9784003101019", strict=True)
+    ''
+    """
     s = clean(raw)
     if strict and not is_valid(s):
         return ""
@@ -46,8 +57,25 @@ def to_isbn13(raw: str | None, *, strict: bool = False) -> str:
     return core + _check13(core)
 
 
-def to_isbn10(raw: str | None) -> str:
-    s = to_isbn13(raw)
+def to_isbn10(raw: str | None, *, strict: bool = False) -> str:
+    """Return the ISBN-10 form, or ``""``.
+
+    Only ``978…`` ISBN-13 values convert (``979…`` has no ISBN-10 equivalent).
+    ``strict`` mirrors ``to_isbn13``: repair a wrong check digit by default,
+    reject it when ``strict=True``.
+
+    >>> to_isbn10("978-4-00-310101-8")
+    '4003101014'
+    >>> to_isbn10("080442957X")
+    '080442957X'
+    >>> to_isbn10("9784003101019", strict=True)
+    ''
+    >>> to_isbn10("9791032300824")
+    ''
+    """
+    if strict and not is_valid(raw):
+        return ""
+    s = to_isbn13(raw, strict=strict)
     if not s.startswith("978"):
         return ""
     return s[3:12] + _check10(s[3:12])

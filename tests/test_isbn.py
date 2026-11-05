@@ -13,7 +13,23 @@ def test_convert():
     assert to_isbn10("9784003101018") == "4003101014"
     assert to_isbn13("9784003101019") == "9784003101018"  # repaired
     assert to_isbn13("9784003101019", strict=True) == ""
+    assert to_isbn10("9784003101019") == "4003101014"  # repaired via 13
+    assert to_isbn10("9784003101019", strict=True) == ""
+    assert to_isbn10("4003101015") == "4003101014"  # ISBN-10 check repaired
+    assert to_isbn10("4003101015", strict=True) == ""
     assert to_isbn10("9798000000000") == ""
+    assert to_isbn10("9791032300824") == ""  # 979 has no ISBN-10
+    assert to_isbn10("9791032300824", strict=True) == ""
+    assert to_isbn13("") == to_isbn13(None) == ""
+    assert to_isbn10("") == to_isbn10(None) == ""
+
+
+def test_convert_roundtrip_and_hyphens():
+    assert to_isbn10(to_isbn13("4-00-310101-4")) == "4003101014"
+    assert to_isbn13(to_isbn10("978-4-00-310101-8")) == "9784003101018"
+    assert to_isbn10("978-4-00-310101-8", strict=True) == "4003101014"
+    assert to_isbn13("080442957X", strict=True) == "9780804429573"
+    assert to_isbn10("9780804429573", strict=True) == "080442957X"
 
 
 def test_x_check_digit():

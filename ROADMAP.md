@@ -27,7 +27,7 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] `fold()`: katakana ⇄ hiragana as its own option (`kana="hira"|"kata"|False`)
 - [x] ISBN: hyphenation for English-language groups (978-0, 978-1)
 - [x] ISBN: hyphenation for 978-7 and 978-986 / 978-957
-- [ ] ISBN: `to_isbn10()` / `to_isbn13()` conversion with check-digit validation
+- [x] ISBN: `to_isbn10()` / `to_isbn13()` conversion with check-digit validation
 - [ ] Lookup: merge results across sources, filling missing fields
 - [ ] Lookup: batch lookup for many ISBNs with built-in rate limiting
 - [ ] CLI: `hondana isbn` — find, validate and hyphenate ISBNs in text
