@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hondana"
+name = "hondana-ja"
 version = "0.1.0"
 description = "Fold Japanese/CJK book metadata for matching (簡繁・新旧字体・かな・全半角) and look up ISBNs with openBD → NDL → Google Books → Open Library fallback."
 readme = "README.en.md"
