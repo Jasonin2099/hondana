@@ -2,7 +2,9 @@
 
 CiNii Books is available as an optional extra source (``order=(..., "cinii")``).
 
-Each source is tried on its own; one timing out never skips the rest. No
+Each source is tried on its own; one timing out never skips the rest.
+``lookup(..., merge=True)`` queries every source and fills missing fields;
+``lookup_many()`` batches ISBNs with an optional ``rate`` limit. No
 third-party dependencies — pass your own ``fetch`` to use httpx/requests,
 add caching, or stub the network in tests.
 """
@@ -22,7 +24,7 @@ from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 from .isbn import to_isbn13
 
-__all__ = ["Book", "lookup", "SOURCES", "Fetch", "urllib_fetch", "cached"]
+__all__ = ["Book", "lookup", "lookup_many", "SOURCES", "Fetch", "urllib_fetch", "cached"]
 
 # fetch(url, params, timeout) -> (status_code, body_text)
 Fetch = Callable[[str, Dict[str, Any], float], Tuple[int, str]]
@@ -210,6 +212,31 @@ def _recording(fetch: Fetch, sink: "list[str]") -> Fetch:
     return f
 
 
+_MERGE_FIELDS = ("title", "author", "publisher", "year", "cover")
+
+
+def _merge_books(books: "list[Book]") -> Book:
+    """Build one Book by preferring the first non-empty value for each field.
+
+    Sources that contributed at least one field are joined with ``+``
+    (e.g. ``"openBD+NDL"``). ``raw`` keeps the first non-``None`` body.
+    """
+    out = Book(isbn=books[0].isbn)
+    contributors: "list[str]" = []
+    for b in books:
+        used = False
+        for f in _MERGE_FIELDS:
+            if not getattr(out, f) and getattr(b, f):
+                setattr(out, f, getattr(b, f))
+                used = True
+        if used and b.source and b.source not in contributors:
+            contributors.append(b.source)
+        if out.raw is None and b.raw is not None:
+            out.raw = b.raw
+    out.source = "+".join(contributors)
+    return out
+
+
 def lookup(
     raw_isbn: str,
     *,
@@ -218,6 +245,7 @@ def lookup(
     on_error: Optional[Callable[[str, BaseException], None]] = None,
     timeouts: Optional["dict[str, float]"] = None,
     raw: bool = False,
+    merge: bool = False,
 ) -> Optional[Book]:
     """Look an ISBN up. Returns ``None`` for an invalid ISBN or when no source knows it.
 
@@ -226,6 +254,11 @@ def lookup(
 
     ``raw=True`` keeps the winning source's response body on ``Book.raw``, for
     debugging a field that came out wrong. It is left out of ``to_dict()`` otherwise.
+    With ``merge=True``, ``raw`` keeps the first successful source's body.
+
+    ``merge=True`` queries every source in ``order`` and fills missing fields from
+    later ones (first non-empty wins per field). Default ``False`` keeps the
+    first-wins behaviour.
     """
     isbn = to_isbn13(raw_isbn, strict=True)
     if not isbn:
@@ -233,6 +266,7 @@ def lookup(
     unknown = set(timeouts or ()) - set(SOURCES)
     if unknown:
         raise ValueError(f"unknown source(s) in timeouts: {', '.join(sorted(unknown))}")
+    found: "list[Book]" = []
     for name in order:
         f = fetch if not timeouts or name not in timeouts else _with_timeout(fetch, timeouts[name])
         last: "list[str]" = []
@@ -247,5 +281,45 @@ def lookup(
         if b:
             if raw and last:
                 b.raw = last[-1]
-            return b
-    return None
+            if not merge:
+                return b
+            found.append(b)
+    if not found:
+        return None
+    return _merge_books(found) if merge else None
+
+
+def lookup_many(
+    isbns: Iterable[str],
+    *,
+    fetch: Fetch = urllib_fetch,
+    order: Iterable[str] = DEFAULT_ORDER,
+    on_error: Optional[Callable[[str, BaseException], None]] = None,
+    timeouts: Optional["dict[str, float]"] = None,
+    raw: bool = False,
+    merge: bool = False,
+    rate: float = 0.0,
+    sleep: Callable[[float], None] = time.sleep,
+) -> "list[Optional[Book]]":
+    """Look up many ISBNs; one ``Book|None`` per input, preserving order.
+
+    ``rate`` is the minimum seconds between successive lookups (``0`` = no delay).
+    ``sleep`` is injectable for tests. All other kwargs are forwarded to ``lookup``.
+    """
+    order_t = tuple(order)
+    out: "list[Optional[Book]]" = []
+    for i, raw_isbn in enumerate(isbns):
+        if i and rate > 0:
+            sleep(rate)
+        out.append(
+            lookup(
+                raw_isbn,
+                fetch=fetch,
+                order=order_t,
+                on_error=on_error,
+                timeouts=timeouts,
+                raw=raw,
+                merge=merge,
+            )
+        )
+    return out
