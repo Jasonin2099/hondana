@@ -11,24 +11,27 @@ If you've built book search you've seen it: the user types `图书馆`, the reco
 ## Install
 
 ```bash
-pip install git+https://github.com/Jasonin2099/hondana
+pip install hondana-ja
+# or: pip install git+https://github.com/Jasonin2099/hondana
 ```
 
 ## Use
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
 to_isbn13("4-00-310101-4")                           # '9784003101018'
 hyphenate("9784003101018")                           # '978-4-00-310101-8' (978-0/1, 978-4, 978-7, 978-957/986)
 
-book = lookup("9784003101018")    # hits the network; None if nobody knows it
+book = lookup("9784003101018")                       # hits the network; None if nobody knows it
+book = lookup("9784003101018", merge=True)           # fill missing fields from later sources
+books = lookup_many(["978…", "978…"], rate=0.5)      # batch; rate = min seconds between lookups
 print(book.title, book.source)
 ```
 
-CLI: `python -m hondana fold "ＡＢＣ　入門"` · `python -m hondana fold --explain "ﾊﾘｰ・ﾎﾟｯﾀｰ"` (every step) · `python -m hondana isbn 9784003101018`
+CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `lookup 978…` · `lookup --merge --format table 978… 978…`
 
 ## What `fold()` does
 
@@ -43,7 +46,7 @@ Why not just NFKC? See [docs/why-not-nfkc.md](docs/why-not-nfkc.md).
 
 ## ISBN lookup
 
-Each source is tried independently, so one timeout doesn't skip the rest. Pass your own `fetch(url, params, timeout) -> (status, text)` to use another HTTP client, add caching, or stub the network in tests. `cached(fetch, ttl=3600)` wraps any fetch with an in-memory TTL cache: `lookup(isbn, fetch=cached())`.
+Each source is tried independently, so one timeout doesn't skip the rest. `merge=True` queries every source in `order` and fills missing fields (first non-empty wins; `source` becomes e.g. `openBD+NDL`). `lookup_many()` looks up many ISBNs in order; `rate` sets the minimum seconds between lookups. Pass your own `fetch(url, params, timeout) -> (status, text)` to use another HTTP client, add caching, or stub the network in tests. `cached(fetch, ttl=3600)` wraps any fetch with an in-memory TTL cache: `lookup(isbn, fetch=cached())`.
 
 ## Tests
 

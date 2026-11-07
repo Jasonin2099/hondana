@@ -16,20 +16,23 @@
 ## 安装
 
 ```bash
-pip install git+https://github.com/Jasonin2099/hondana
+pip install hondana-ja
+# 或：pip install git+https://github.com/Jasonin2099/hondana
 ```
 
 ## 用法
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
 to_isbn13("4-00-310101-4")                           # '9784003101018'
 hyphenate("9784003101018")                           # '978-4-00-310101-8'（支持日本 978-4、英语区 978-0 / 978-1、中国 978-7、台湾 978-957 / 978-986）
 
-book = lookup("9784003101018")    # 走网络；查不到返回 None
+book = lookup("9784003101018")                 # 走网络；查不到返回 None
+book = lookup("9784003101018", merge=True)     # 多源合并，缺字段由后面的源补上
+books = lookup_many(["978…", "978…"], rate=0.5)  # 批量查询，rate=每次间隔秒数
 print(book.title, book.source)
 ```
 
@@ -38,7 +41,10 @@ print(book.title, book.source)
 ```bash
 python -m hondana fold "ＡＢＣ　入門"
 python -m hondana fold --explain "ﾊﾘｰ・ﾎﾟｯﾀｰ"   # 打印每一步的结果
-python -m hondana isbn 9784003101018
+python -m hondana isbn 9784003101018            # 校验并加连字符（不联网）
+python -m hondana isbn "文中 ISBN 978-4-00-310101-8 …"  # 从文本里找出 ISBN
+python -m hondana lookup 9784003101018          # 联网查询（JSON）
+python -m hondana lookup --merge --format table 978… 978…
 ```
 
 ## `fold()` 做了什么
@@ -56,7 +62,7 @@ python -m hondana isbn 9784003101018
 
 ## ISBN 查询
 
-`lookup()` 每个来源各自 try，一个超时不会连累后面。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。CiNii Books 是可选来源，默认不查，用 `order=(..., "cinii")` 打开（可设 `HONDANA_CINII_APPID`）。
+`lookup()` 每个来源各自 try，一个超时不会连累后面。`merge=True` 会查完 `order` 里的每个源，按字段取第一个非空值并拼接 `source`（如 `openBD+NDL`）。`lookup_many()` 按输入顺序批量查询，`rate` 控制两次之间的最短间隔秒数。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。CiNii Books 是可选来源，默认不查，用 `order=(..., "cinii")` 打开（可设 `HONDANA_CINII_APPID`）。
 
 ## 测试
 

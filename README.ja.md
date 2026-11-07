@@ -11,24 +11,27 @@
 ## インストール
 
 ```bash
-pip install git+https://github.com/Jasonin2099/hondana
+pip install hondana-ja
+# または: pip install git+https://github.com/Jasonin2099/hondana
 ```
 
 ## 使い方
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
 to_isbn13("4-00-310101-4")                           # '9784003101018'
 hyphenate("9784003101018")                           # '978-4-00-310101-8'（978-0/1・978-4・978-7・978-957/986 に対応）
 
-book = lookup("9784003101018")    # ネットワークに出ます。見つからなければ None
+book = lookup("9784003101018")                       # ネットワークに出ます。見つからなければ None
+book = lookup("9784003101018", merge=True)           # 欠けた項目を後続ソースで補完
+books = lookup_many(["978…", "978…"], rate=0.5)      # まとめて検索。rate は間隔（秒）
 print(book.title, book.source)
 ```
 
-CLI：`python -m hondana fold "ＡＢＣ　入門"` ／ `python -m hondana fold --explain "ﾊﾘｰ・ﾎﾟｯﾀｰ"`（各ステップを表示）／ `python -m hondana isbn 9784003101018`
+CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `lookup 978…` ／ `lookup --merge --format table 978… 978…`
 
 ## `fold()` の中身
 
@@ -43,6 +46,6 @@ NFKC だけでは足りない理由は [docs/why-not-nfkc.md](docs/why-not-nfkc.
 
 ## ISBN 検索
 
-ソースごとに独立して試すので、一つがタイムアウトしても残りは続行します。`fetch(url, params, timeout) -> (status, text)` を渡せば、HTTP クライアントの差し替え・キャッシュ・テスト用スタブが自由です。メモリ上の簡易 TTL キャッシュは `lookup(isbn, fetch=cached(ttl=3600))` で使えます。
+ソースごとに独立して試すので、一つがタイムアウトしても残りは続行します。`merge=True` は `order` の全ソースを問い合わせ、項目ごとに最初の非空値を採用します（`source` は `openBD+NDL` のように連結）。`lookup_many()` は入力順に一括検索し、`rate` で間隔（秒）を指定できます。`fetch(url, params, timeout) -> (status, text)` を渡せば、HTTP クライアントの差し替え・キャッシュ・テスト用スタブが自由です。メモリ上の簡易 TTL キャッシュは `lookup(isbn, fetch=cached(ttl=3600))` で使えます。
 
 ロードマップ：[ROADMAP.md](ROADMAP.md) ・ MIT License
