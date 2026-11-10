@@ -31,7 +31,7 @@ books = lookup_many(["978…", "978…"], rate=0.5)      # まとめて検索。
 print(book.title, book.source)
 ```
 
-CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `lookup 978…` ／ `lookup --merge --format table 978… 978…`
+CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `lookup 978…` ／ `lookup --merge --format table 978… 978…` ／ `isbn --find < paper.txt | lookup`（標準入力から ISBN を読む。間隔は既定 0.5 秒、`--rate` で変更）
 
 ## `fold()` の中身
 
@@ -43,6 +43,8 @@ CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（�
 各ステップは個別にオフにできます。机／機、干、后、叶 のように日本語では別の字になる簡体字は、別の本を混ぜないようあえて入れていません。
 
 NFKC だけでは足りない理由は [docs/why-not-nfkc.md](docs/why-not-nfkc.md)（英語・対照表つき）。
+
+よくある使い方（書籍リストの整理と重複除去、入力どおりの目録検索、論文の参考文献の ISBN チェック、書誌情報の一括補完、シェルでのパイプ）は [docs/recipes.md](docs/recipes.md)（英語。サンプルはすべてテストで実行）。
 
 ## ISBN 検索
 

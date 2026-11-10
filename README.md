@@ -45,6 +45,7 @@ python -m hondana isbn 9784003101018            # 校验并加连字符（不联
 python -m hondana isbn "文中 ISBN 978-4-00-310101-8 …"  # 从文本里找出 ISBN
 python -m hondana lookup 9784003101018          # 联网查询（JSON）
 python -m hondana lookup --merge --format table 978… 978…
+python -m hondana isbn --find < paper.txt | python -m hondana lookup   # 从 stdin 读 ISBN，默认每次间隔 0.5 秒（--rate 可改）
 ```
 
 ## `fold()` 做了什么
@@ -59,6 +60,8 @@ python -m hondana lookup --merge --format table 978… 978…
 有些简体字在日文里是另一个字（机 / 機、干、后、叶），故意没收进字表，免得把不同的书混在一起。
 
 为什么不直接用 NFKC：见 [docs/why-not-nfkc.md](docs/why-not-nfkc.md)（英文，附对照表）。
+
+常见用法（整理去重书单、按用户输入搜索目录、检查论文参考文献里的 ISBN、批量补全书目信息、命令行管道）：见 [docs/recipes.md](docs/recipes.md)（英文，示例代码都在测试里跑过）。
 
 ## ISBN 查询
 

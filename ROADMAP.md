@@ -32,4 +32,4 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] Lookup: batch lookup for many ISBNs with built-in rate limiting
 - [x] CLI: `hondana isbn` — find, validate and hyphenate ISBNs in text
 - [x] CLI: `hondana lookup` with JSON or table output
-- [ ] Docs: practical recipes (cleaning a book list, reference lists in papers)
+- [x] Docs: practical recipes (cleaning a book list, reference lists in papers) — docs/recipes.md, examples run in tests/test_docs.py

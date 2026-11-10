@@ -31,7 +31,7 @@ books = lookup_many(["978…", "978…"], rate=0.5)      # batch; rate = min sec
 print(book.title, book.source)
 ```
 
-CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `lookup 978…` · `lookup --merge --format table 978… 978…`
+CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `lookup 978…` · `lookup --merge --format table 978… 978…` · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change)
 
 ## What `fold()` does
 
@@ -43,6 +43,8 @@ CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `i
 Every step can be switched off (`fold(s, kana=False)` etc.). Simplified characters that are a *different* everyday Japanese character (机 vs 機, 干, 后, 叶) are left out on purpose.
 
 Why not just NFKC? See [docs/why-not-nfkc.md](docs/why-not-nfkc.md).
+
+Recipes (cleaning and de-duplicating a book list, searching a catalogue the way people type, checking the ISBNs in a reference list, filling in missing metadata, shell pipelines): [docs/recipes.md](docs/recipes.md). Every example there is run by the test suite.
 
 ## ISBN lookup
 
