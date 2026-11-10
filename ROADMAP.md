@@ -33,3 +33,14 @@ Small steps, roughly one per day. Tick them off as they land.
 - [x] CLI: `hondana isbn` — find, validate and hyphenate ISBNs in text
 - [x] CLI: `hondana lookup` with JSON or table output
 - [x] Docs: practical recipes (cleaning a book list, reference lists in papers) — docs/recipes.md, examples run in tests/test_docs.py
+
+## Batch 3 (toward 0.3.0)
+
+Research existing tools first (bibtex/CSL libraries, isbnlib range data) before building.
+
+- [ ] Export: `Book` → BibTeX, RIS, CSL-JSON; CLI `hondana lookup --format bibtex|ris|csl`
+- [ ] CLI: `hondana dedupe books.csv` — dedupe by ISBN or folded title + author, report duplicate groups
+- [ ] ISBN: generate hyphenation ranges from the ISBN International RangeMessage.xml (covers 978-3, 978-2, 978-89, 979-…), with an update script
+- [ ] Lookup: search by title / author without ISBN (NDL Search, Open Library), results ranked with `fold()`
+- [ ] openBD: parse Japanese C-code and NDC into optional `Book` fields
+- [ ] Release 0.3.0 (GitHub Release → PyPI)
