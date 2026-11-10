@@ -105,13 +105,14 @@ def _format_table(books: list[Book]) -> str:
 
 
 def _cmd_lookup(a: argparse.Namespace) -> int:
-    isbns = list(a.isbn)
+    isbns = list(a.isbn) or _read_text(()).split()
     if not isbns:
         print("no ISBN given", file=sys.stderr)
         return 1
     books = lookup_many(
         isbns,
         merge=a.merge,
+        rate=a.rate,
         on_error=lambda n, e: print(f"# {n}: {type(e).__name__}", file=sys.stderr),
     )
     found = [b for b in books if b]
@@ -163,7 +164,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         "lookup",
         help="look ISBNs up (openBD → NDL → Google Books → Open Library)",
     )
-    l.add_argument("isbn", nargs="+", help="one or more ISBNs")
+    l.add_argument("isbn", nargs="*", help="one or more ISBNs; reads them from stdin when omitted")
+    l.add_argument("--rate", type=float, default=0.5, metavar="SECONDS",
+                   help="minimum seconds between lookups (default 0.5; be kind to free APIs)")
     l.add_argument("--merge", action="store_true", help="fill missing fields from later sources")
     l.add_argument(
         "--format", choices=("json", "table"), default=None,
