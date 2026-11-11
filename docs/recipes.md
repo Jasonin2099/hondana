@@ -157,3 +157,41 @@ python -m hondana isbn --find < paper.txt | xargs python -m hondana lookup --mer
 # Why do these two titles (not) match?
 python -m hondana fold --explain "ﾊﾘｰ・ﾎﾟｯﾀｰ"
 ```
+
+## Export a reference list
+
+`lookup()` returns a `Book`; turn that into something a citation manager
+or a `.bib` file can eat. BibTeX, RIS and CSL-JSON are written in the
+library itself — the usual converters (bibtexparser, rispy, citeproc-py,
+betterbib) would have added dependencies, and `Book` only has a handful
+of fields to map.
+
+```python
+from hondana import Book, dumps, to_bibtex, to_csl, to_ris
+
+book = Book(
+    isbn="9784003101018",
+    title="吾輩は猫である",
+    author="夏目漱石／著",
+    publisher="岩波書店",
+    year="1990",
+)
+
+bib = to_bibtex(book)
+assert "@book{isbn9784003101018," in bib
+assert "author = {夏目漱石}" in bib          # the trailing ／著 is dropped
+assert "isbn = {978-4-00-310101-8}" in bib
+
+assert "TY  - BOOK" in to_ris(book)
+assert to_csl(book)["author"] == [{"literal": "夏目漱石"}]
+assert to_csl(book)["issued"] == {"date-parts": [[1990]]}
+
+# Several books at once (CSL-JSON becomes a JSON array):
+other = Book(isbn="9780140449136", title="Crime and Punishment",
+             author="Dostoyevsky, Fyodor", publisher="Penguin", year="2003")
+csl = dumps([book, other], "csl")
+assert csl.strip().startswith("[")
+```
+
+From the shell: `python -m hondana lookup --format bibtex 9784003101018`
+(also `--format ris` and `--format csl`).

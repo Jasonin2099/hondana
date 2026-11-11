@@ -101,6 +101,18 @@ class Book:
             del d["raw"]
         return d
 
+    def to_bibtex(self) -> str:
+        from .export import to_bibtex
+        return to_bibtex(self)
+
+    def to_ris(self) -> str:
+        from .export import to_ris
+        return to_ris(self)
+
+    def to_csl(self) -> Dict[str, Any]:
+        from .export import to_csl
+        return to_csl(self)
+
 
 def _https(u: str) -> str:
     return u.replace("http://", "https://", 1) if u else ""

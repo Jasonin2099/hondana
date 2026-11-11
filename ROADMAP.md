@@ -38,7 +38,7 @@ Small steps, roughly one per day. Tick them off as they land.
 
 Research existing tools first (bibtex/CSL libraries, isbnlib range data) before building.
 
-- [ ] Export: `Book` → BibTeX, RIS, CSL-JSON; CLI `hondana lookup --format bibtex|ris|csl`
+- [x] Export: `Book` → BibTeX, RIS, CSL-JSON; CLI `hondana lookup --format bibtex|ris|csl`
 - [ ] CLI: `hondana dedupe books.csv` — dedupe by ISBN or folded title + author, report duplicate groups
 - [ ] ISBN: generate hyphenation ranges from the ISBN International RangeMessage.xml (covers 978-3, 978-2, 978-89, 979-…), with an update script
 - [ ] Lookup: search by title / author without ISBN (NDL Search, Open Library), results ranked with `fold()`

@@ -18,7 +18,7 @@ pip install hondana-ja
 ## Use
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -29,9 +29,10 @@ book = lookup("9784003101018")                       # hits the network; None if
 book = lookup("9784003101018", merge=True)           # fill missing fields from later sources
 books = lookup_many(["978…", "978…"], rate=0.5)      # batch; rate = min seconds between lookups
 print(book.title, book.source)
+print(to_bibtex(book))   # or to_ris(book), to_csl(book); also book.to_bibtex()
 ```
 
-CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `lookup 978…` · `lookup --merge --format table 978… 978…` · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change)
+CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `lookup 978…` · `lookup --merge --format table 978… 978…` · `lookup --format bibtex 978…` (also `ris` / `csl`) · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change)
 
 ## What `fold()` does
 

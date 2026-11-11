@@ -23,7 +23,7 @@ pip install hondana-ja
 ## 用法
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -34,6 +34,7 @@ book = lookup("9784003101018")                 # 走网络；查不到返回 Non
 book = lookup("9784003101018", merge=True)     # 多源合并，缺字段由后面的源补上
 books = lookup_many(["978…", "978…"], rate=0.5)  # 批量查询，rate=每次间隔秒数
 print(book.title, book.source)
+print(to_bibtex(book))   # 也可 to_ris(book)、to_csl(book)，或 book.to_bibtex()
 ```
 
 命令行：
@@ -45,6 +46,7 @@ python -m hondana isbn 9784003101018            # 校验并加连字符（不联
 python -m hondana isbn "文中 ISBN 978-4-00-310101-8 …"  # 从文本里找出 ISBN
 python -m hondana lookup 9784003101018          # 联网查询（JSON）
 python -m hondana lookup --merge --format table 978… 978…
+python -m hondana lookup --format bibtex 9784003101018   # 也可 ris / csl
 python -m hondana isbn --find < paper.txt | python -m hondana lookup   # 从 stdin 读 ISBN，默认每次间隔 0.5 秒（--rate 可改）
 ```
 

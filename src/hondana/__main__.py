@@ -12,6 +12,7 @@ import sys
 from typing import List, Optional, Sequence
 
 from .isbn import find_isbns, hyphenate, is_valid, to_isbn13
+from .export import dumps
 from .lookup import Book
 from . import fold, fold_steps, lookup_many
 
@@ -128,6 +129,9 @@ def _cmd_lookup(a: argparse.Namespace) -> int:
         if fmt == "json":
             payload = found[0].to_dict() if len(isbns) == 1 else [b.to_dict() for b in found]
             print(json.dumps(payload, ensure_ascii=False, indent=2))
+        elif fmt in ("bibtex", "ris", "csl"):
+            # dumps already ends with a newline; avoid print()'s extra one.
+            sys.stdout.write(dumps(found if len(isbns) > 1 else found[0], fmt))
         else:
             print(_format_table(found))
 
@@ -169,7 +173,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                    help="minimum seconds between lookups (default 0.5; be kind to free APIs)")
     l.add_argument("--merge", action="store_true", help="fill missing fields from later sources")
     l.add_argument(
-        "--format", choices=("json", "table"), default=None,
+        "--format", choices=("json", "table", "bibtex", "ris", "csl"), default=None,
         help="output format (default: json for one ISBN, table for many)",
     )
 
