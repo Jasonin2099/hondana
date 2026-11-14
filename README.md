@@ -23,7 +23,7 @@ pip install hondana-ja
 ## 用法
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, dedupe, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -33,7 +33,8 @@ hyphenate("9784003101018")                           # '978-4-00-310101-8'（按
 book = lookup("9784003101018")                 # 走网络；查不到返回 None
 book = lookup("9784003101018", merge=True)     # 多源合并，缺字段由后面的源补上
 books = lookup_many(["978…", "978…"], rate=0.5)  # 批量查询，rate=每次间隔秒数
-print(book.title, book.source)
+print(book.title, book.source, book.ccode, book.ndc)  # ccode / ndc 来自 openBD，没有则为空
+hits = search("吾輩は猫である")                  # 不靠 ISBN：NDL Search 与 Open Library，用 fold() 排序
 print(to_bibtex(book))   # 也可 to_ris(book)、to_csl(book)，或 book.to_bibtex()
 ```
 
@@ -48,6 +49,7 @@ python -m hondana lookup 9784003101018          # 联网查询（JSON）
 python -m hondana lookup --merge --format table 978… 978…
 python -m hondana lookup --format bibtex 9784003101018   # 也可 ris / csl
 python -m hondana isbn --find < paper.txt | python -m hondana lookup   # 从 stdin 读 ISBN，默认每次间隔 0.5 秒（--rate 可改）
+python -m hondana search "吾輩は猫である"    # 按书名/作者搜（也可用 --title / --author）
 python -m hondana dedupe books.csv           # 按 ISBN 或折叠后的书名+作者报告重复组；--unique clean.csv 写出去重结果
 ```
 
@@ -68,7 +70,7 @@ python -m hondana dedupe books.csv           # 按 ISBN 或折叠后的书名+�
 
 ## ISBN 查询
 
-`lookup()` 每个来源各自 try，一个超时不会连累后面。`merge=True` 会查完 `order` 里的每个源，按字段取第一个非空值并拼接 `source`（如 `openBD+NDL`）。`lookup_many()` 按输入顺序批量查询，`rate` 控制两次之间的最短间隔秒数。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。CiNii Books 是可选来源，默认不查，用 `order=(..., "cinii")` 打开（可设 `HONDANA_CINII_APPID`）。
+`lookup()` 每个来源各自 try，一个超时不会连累后面。`merge=True` 会查完 `order` 里的每个源，按字段取第一个非空值并拼接 `source`（如 `openBD+NDL`）。`lookup_many()` 按输入顺序批量查询，`rate` 控制两次之间的最短间隔秒数。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。CiNii Books 是可选来源，默认不查，用 `order=(..., "cinii")` 打开（可设 `HONDANA_CINII_APPID`）。openBD 若带了分类信息，会填入 `Book.ccode`（日本图书 C 代码，不含前导 C）和 `Book.ndc`。没有 ISBN、只有书名或作者时用 `search()`，默认查国立国会图书馆和 Open Library，结果用 `fold()` 排序。
 
 ## 测试
 

@@ -8,6 +8,7 @@ Python block on this page runs offline as written and is executed by
 - [Search a catalogue the way people type](#search-a-catalogue-the-way-people-type)
 - [Check the ISBNs in a paper's reference list](#check-the-isbns-in-a-papers-reference-list)
 - [Fill in missing metadata](#fill-in-missing-metadata)
+- [Search by title or author](#search-by-title-or-author)
 - [From the shell](#from-the-shell)
 
 ## Clean and de-duplicate a book list
@@ -141,6 +142,47 @@ For real runs:
 - Pass `on_error=lambda name, err: print(name, err)` to see which source failed
   and why, and `timeouts={"ndl": 30}` if NDL Search is slow from where you are.
 
+
+## Search by title or author
+
+When you do not have an ISBN, `search()` queries NDL Search and Open Library
+and ranks the hits with `fold()`, so typographic variants of the same title
+float to the top. A tiny fake stands in for the network here, as in the other
+recipes.
+
+```python
+import json
+from hondana import search
+
+def fake_fetch(url, params, timeout):
+    if "ndlsearch" in url:
+        return 200, """<rss><item>
+            <title>吾輩は猫である</title>
+            <dc:creator>夏目, 漱石</dc:creator>
+            <dc:publisher>岩波書店</dc:publisher>
+            <dcterms:issued>1990</dcterms:issued>
+            <dc:identifier>ISBN 978-4-00-310101-8</dc:identifier>
+        </item></rss>"""
+    if "openlibrary.org/search" in url:
+        return 200, json.dumps({"docs": [
+            {"title": "I Am a Cat", "author_name": ["Natsume Soseki"],
+             "first_publish_year": 1970, "isbn": ["9780804832410"]}
+        ]})
+    return 404, ""
+
+hits = search("吾輩は猫である", fetch=fake_fetch, limit=5)
+assert hits[0].title == "吾輩は猫である" and hits[0].source == "NDL"
+assert hits[0].isbn == "9784003101018"
+assert any(h.title == "I Am a Cat" for h in hits)
+```
+
+`search("吾輩は猫である", author="夏目漱石")` also works, or pass `title=` and
+`author=` separately. From the shell: `python -m hondana search "吾輩は猫である"`.
+
+When openBD has classification data, `lookup()` fills `Book.ccode` (the 4-digit
+Japanese C-code, without a leading C) and `Book.ndc`. ONIX subject scheme 79 is
+the bookseller genre code and is not treated as NDC.
+
 ## From the shell
 
 The CLI reads its text from arguments or stdin, so it fits into pipes:
@@ -155,6 +197,9 @@ python -m hondana isbn --find < paper.txt | xargs python -m hondana lookup --mer
 
 # Why do these two titles (not) match?
 python -m hondana fold --explain "ﾊﾘｰ・ﾎﾟｯﾀｰ"
+
+# Title search, no ISBN
+python -m hondana search "吾輩は猫である"
 ```
 
 ## Export a reference list

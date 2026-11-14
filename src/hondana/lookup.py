@@ -4,9 +4,11 @@ CiNii Books is available as an optional extra source (``order=(..., "cinii")``).
 
 Each source is tried on its own; one timing out never skips the rest.
 ``lookup(..., merge=True)`` queries every source and fills missing fields;
-``lookup_many()`` batches ISBNs with an optional ``rate`` limit. No
-third-party dependencies — pass your own ``fetch`` to use httpx/requests,
-add caching, or stub the network in tests.
+``lookup_many()`` batches ISBNs with an optional ``rate`` limit.
+``search()`` looks up a title or author (no ISBN) via NDL Search and
+Open Library, and ranks hits with ``fold()``. No third-party dependencies
+— pass your own ``fetch`` to use httpx/requests, add caching, or stub
+the network in tests.
 """
 from __future__ import annotations
 
@@ -23,8 +25,9 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 from .isbn import to_isbn13
+from .fold import fold
 
-__all__ = ["Book", "lookup", "lookup_many", "SOURCES", "Fetch", "urllib_fetch", "cached"]
+__all__ = ["Book", "lookup", "lookup_many", "search", "SOURCES", "Fetch", "urllib_fetch", "cached"]
 
 # fetch(url, params, timeout) -> (status_code, body_text)
 Fetch = Callable[[str, Dict[str, Any], float], Tuple[int, str]]
@@ -89,6 +92,10 @@ class Book:
     year: str = ""
     cover: str = ""
     source: str = ""
+    #: Japanese C-code (4 digits, no leading ``C``), from openBD when present.
+    ccode: str = ""
+    #: NDC class mark, from openBD ``hanmoto.ndccode`` when present.
+    ndc: str = ""
     #: The source's response body, only filled in by ``lookup(..., raw=True)``.
     raw: Optional[str] = field(default=None, repr=False, compare=False)
 
@@ -118,15 +125,56 @@ def _https(u: str) -> str:
     return u.replace("http://", "https://", 1) if u else ""
 
 
+def _as_list(v: Any) -> list[Any]:
+    if v is None:
+        return []
+    return v if isinstance(v, list) else [v]
+
+
+def _openbd_classifiers(payload: "dict[str, Any]") -> "tuple[str, str]":
+    """Return ``(ccode, ndc)`` from an openBD record.
+
+    C-code is ONIX subject scheme 78 (Japanese book trade C-Code), with
+    ``hanmoto.ccode`` as a fallback. NDC is ``hanmoto.ndccode`` (not ONIX
+    scheme 79, which is the bookseller genre code). A leading ``C`` on the
+    C-code, if present, is dropped.
+    """
+    ccode = ""
+    subjects = ((payload.get("onix") or {}).get("DescriptiveDetail") or {}).get("Subject")
+    for s in _as_list(subjects):
+        if not isinstance(s, dict):
+            continue
+        scheme = str(s.get("SubjectSchemeIdentifier") or "").strip()
+        code = str(s.get("SubjectCode") or "").strip()
+        if scheme == "78" and code and not ccode:
+            ccode = code[1:] if code[:1] in "CcＣｃ" else code
+    han = payload.get("hanmoto") or {}
+    ndc = ""
+    if isinstance(han, dict):
+        ndc = str(han.get("ndccode") or han.get("ndc") or "").strip()
+        if not ccode:
+            raw = str(han.get("ccode") or han.get("c_code") or "").strip()
+            if raw:
+                ccode = raw[1:] if raw[:1] in "CcＣｃ" else raw
+    return ccode, ndc
+
+
 def _openbd(isbn: str, fetch: Fetch) -> Optional[Book]:
     st, body = fetch("https://api.openbd.jp/v1/get", {"isbn": isbn}, 8)
     if st != 200:
         return None
     d = (json.loads(body or "null") or [None])[0]
-    s = (d or {}).get("summary") or {}
+    if not d:
+        return None
+    s = d.get("summary") or {}
     if not s.get("title"):
         return None
-    return Book(isbn, s.get("title", ""), s.get("author", ""), s.get("publisher", ""), (s.get("pubdate") or "")[:4], _https(s.get("cover", "")), "openBD")
+    ccode, ndc = _openbd_classifiers(d)
+    return Book(
+        isbn, s.get("title", ""), s.get("author", ""), s.get("publisher", ""),
+        (s.get("pubdate") or "")[:4], _https(s.get("cover", "")), "openBD",
+        ccode=ccode, ndc=ndc,
+    )
 
 
 def _ndl(isbn: str, fetch: Fetch) -> Optional[Book]:
@@ -224,7 +272,7 @@ def _recording(fetch: Fetch, sink: "list[str]") -> Fetch:
     return f
 
 
-_MERGE_FIELDS = ("title", "author", "publisher", "year", "cover")
+_MERGE_FIELDS = ("title", "author", "publisher", "year", "cover", "ccode", "ndc")
 
 
 def _merge_books(books: "list[Book]") -> Book:
@@ -335,3 +383,192 @@ def lookup_many(
             )
         )
     return out
+
+
+def _xml_tag(item: str, tag: str) -> str:
+    m = re.search(r"<%s[^>]*>([^<]+)</%s>" % (tag, tag), item)
+    return html.unescape(m.group(1)).strip() if m else ""
+
+
+def _ndl_isbn(item: str) -> str:
+    found: list[str] = []
+    for m in re.finditer(r"<dc:identifier[^>]*>([^<]+)</dc:identifier>", item, re.I):
+        found.append(html.unescape(m.group(1)))
+    for raw in found:
+        # "ISBN 978-4-00-310101-8" or a bare number
+        for token in re.findall(r"97[89][\d\- ]{10,16}|\b\d{9}[\dXx]\b", raw):
+            isbn = to_isbn13(token, strict=True)
+            if isbn:
+                return isbn
+    return ""
+
+
+def _book_from_ndl_item(item: str) -> Optional[Book]:
+    title = _xml_tag(item, "title")
+    if not title:
+        return None
+    issued = _xml_tag(item, "dcterms:issued")
+    year = (re.search(r"\d{4}", issued) or [""])[0] if issued else ""
+    return Book(
+        _ndl_isbn(item),
+        title,
+        _xml_tag(item, "dc:creator"),
+        _xml_tag(item, "dc:publisher"),
+        year,
+        "",
+        "NDL",
+    )
+
+
+def _ndl_search(query: str, title: str, author: str, fetch: Fetch, limit: int) -> list[Book]:
+    params: dict[str, Any] = {"cnt": max(1, min(int(limit), 50))}
+    if query:
+        params["any"] = query
+    else:
+        if title:
+            params["title"] = title
+        if author:
+            params["creator"] = author
+    st, body = fetch("https://ndlsearch.ndl.go.jp/api/opensearch", params, 15)
+    if st != 200 or "<item>" not in (body or ""):
+        return []
+    out: list[Book] = []
+    for chunk in body.split("<item>")[1:]:
+        b = _book_from_ndl_item(chunk)
+        if b:
+            out.append(b)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _ol_search(query: str, title: str, author: str, fetch: Fetch, limit: int) -> list[Book]:
+    params: dict[str, Any] = {"limit": max(1, min(int(limit), 50))}
+    if query:
+        params["q"] = query
+    else:
+        if title:
+            params["title"] = title
+        if author:
+            params["author"] = author
+    st, body = fetch("https://openlibrary.org/search.json", params, 8)
+    if st != 200:
+        return []
+    docs = json.loads(body or "{}").get("docs") or []
+    out: list[Book] = []
+    for doc in docs:
+        if not isinstance(doc, dict):
+            continue
+        name = str(doc.get("title") or "")
+        subtitle = str(doc.get("subtitle") or "")
+        if subtitle:
+            name = name + (": " if name else "") + subtitle
+        if not name:
+            continue
+        isbn = ""
+        for raw in doc.get("isbn") or []:
+            isbn = to_isbn13(str(raw), strict=True)
+            if isbn:
+                break
+        cover = ""
+        if doc.get("cover_i"):
+            cover = "https://covers.openlibrary.org/b/id/%s-M.jpg" % doc["cover_i"]
+        year = str(doc.get("first_publish_year") or "")
+        year = year[:4] if year else ""
+        authors = "、".join(str(a) for a in (doc.get("author_name") or []) if a)
+        pubs = doc.get("publisher") or []
+        publisher = str(pubs[0]) if pubs else ""
+        out.append(Book(isbn, name, authors, publisher, year, cover, "Open Library"))
+        if len(out) >= limit:
+            break
+    return out
+
+
+_SEARCH_SOURCES: dict[str, Any] = {"ndl": _ndl_search, "openlibrary": _ol_search}
+DEFAULT_SEARCH_SOURCES = ("ndl", "openlibrary")
+
+
+def _search_rank(book: Book, query: str, title: str, author: str) -> tuple[int, int, str]:
+    q = fold(query or title)
+    want_author = fold(author)
+    ft = fold(book.title)
+    fa = fold(book.author)
+    if q and ft == q:
+        tscore = 0
+    elif q and ft.startswith(q):
+        tscore = 1
+    elif q and q in ft:
+        tscore = 2
+    elif q:
+        tscore = 3
+    else:
+        tscore = 1
+    if want_author:
+        ascore = 0 if (want_author == fa or want_author in fa or (fa and fa in want_author)) else 1
+    else:
+        ascore = 0
+    return (tscore, ascore, book.title)
+
+
+def _search_merge_key(book: Book) -> tuple[str, ...]:
+    if book.isbn:
+        return ("isbn", book.isbn)
+    title, author = fold(book.title), fold(book.author)
+    if title or author:
+        return ("text", title, author)
+    return ("empty", book.source, book.title)
+
+
+def search(
+    query: str = "",
+    *,
+    title: str = "",
+    author: str = "",
+    fetch: Fetch = urllib_fetch,
+    sources: Iterable[str] = DEFAULT_SEARCH_SOURCES,
+    limit: int = 10,
+    timeouts: Optional["dict[str, float]"] = None,
+    on_error: Optional[Callable[[str, BaseException], None]] = None,
+    raw: bool = False,
+) -> "list[Book]":
+    """Search by title or author, without an ISBN.
+
+    Queries NDL Search and Open Library (override with ``sources``), then
+    ranks hits with :func:`hondana.fold` so typographic variants of the
+    same title float to the top. Pass at least one of ``query``, ``title``
+    or ``author``. ``limit`` caps the result list (per source, then again
+    after merging). ``fetch``, ``timeouts``, ``on_error`` and ``raw``
+    behave as in :func:`lookup`.
+    """
+    query, title, author = (query or "").strip(), (title or "").strip(), (author or "").strip()
+    if not (query or title or author):
+        raise ValueError("search needs a query, title or author")
+    unknown = set(timeouts or ()) - set(_SEARCH_SOURCES)
+    if unknown:
+        raise ValueError(f"unknown source(s) in timeouts: {', '.join(sorted(unknown))}")
+    found: list[Book] = []
+    seen: set[tuple[str, ...]] = set()
+    for name in sources:
+        fn = _SEARCH_SOURCES.get(name)
+        if fn is None:
+            raise ValueError(f"unknown search source: {name}")
+        f = fetch if not timeouts or name not in timeouts else _with_timeout(fetch, timeouts[name])
+        last: list[str] = []
+        if raw:
+            f = _recording(f, last)
+        try:
+            hits = fn(query, title, author, f, limit)
+        except Exception as e:  # network, JSON, anything: next source
+            if on_error:
+                on_error(name, e)
+            continue
+        for i, b in enumerate(hits):
+            if raw and last and i == 0 and b.raw is None:
+                b.raw = last[-1]
+            key = _search_merge_key(b)
+            if key in seen:
+                continue
+            seen.add(key)
+            found.append(b)
+    found.sort(key=lambda b: _search_rank(b, query, title, author))
+    return found[: max(1, int(limit))]

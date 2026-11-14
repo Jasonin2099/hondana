@@ -18,7 +18,7 @@ pip install hondana-ja
 ## Use
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, dedupe, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -28,11 +28,12 @@ hyphenate("9784003101018")                           # '978-4-00-310101-8' (from
 book = lookup("9784003101018")                       # hits the network; None if nobody knows it
 book = lookup("9784003101018", merge=True)           # fill missing fields from later sources
 books = lookup_many(["978…", "978…"], rate=0.5)      # batch; rate = min seconds between lookups
-print(book.title, book.source)
+print(book.title, book.source, book.ccode, book.ndc)  # C-code / NDC from openBD, empty if absent
+hits = search("吾輩は猫である")                  # no ISBN: NDL Search + Open Library, ranked with fold()
 print(to_bibtex(book))   # or to_ris(book), to_csl(book); also book.to_bibtex()
 ```
 
-CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `lookup 978…` · `lookup --merge --format table 978… 978…` · `lookup --format bibtex 978…` (also `ris` / `csl`) · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change) · `dedupe books.csv` (duplicate groups by ISBN or folded title + author; `--unique clean.csv` writes the first spelling of each)
+CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `lookup 978…` · `lookup --merge --format table 978… 978…` · `lookup --format bibtex 978…` (also `ris` / `csl`) · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change) · `search "吾輩は猫である"` (title/author search; also `--title` / `--author`) · `dedupe books.csv` (duplicate groups by ISBN or folded title + author; `--unique clean.csv` writes the first spelling of each)
 
 ## What `fold()` does
 
@@ -49,7 +50,7 @@ Recipes (cleaning and de-duplicating a book list, searching a catalogue the way 
 
 ## ISBN lookup
 
-Each source is tried independently, so one timeout doesn't skip the rest. `merge=True` queries every source in `order` and fills missing fields (first non-empty wins; `source` becomes e.g. `openBD+NDL`). `lookup_many()` looks up many ISBNs in order; `rate` sets the minimum seconds between lookups. Pass your own `fetch(url, params, timeout) -> (status, text)` to use another HTTP client, add caching, or stub the network in tests. `cached(fetch, ttl=3600)` wraps any fetch with an in-memory TTL cache: `lookup(isbn, fetch=cached())`.
+Each source is tried independently, so one timeout doesn't skip the rest. `merge=True` queries every source in `order` and fills missing fields (first non-empty wins; `source` becomes e.g. `openBD+NDL`). `lookup_many()` looks up many ISBNs in order; `rate` sets the minimum seconds between lookups. Pass your own `fetch(url, params, timeout) -> (status, text)` to use another HTTP client, add caching, or stub the network in tests. `cached(fetch, ttl=3600)` wraps any fetch with an in-memory TTL cache: `lookup(isbn, fetch=cached())`. When openBD includes classification, `Book.ccode` (Japanese C-code, without a leading C) and `Book.ndc` are filled in. `search()` looks up a title or author with no ISBN, via NDL Search and Open Library, and ranks hits with `fold()`.
 
 ## Tests
 

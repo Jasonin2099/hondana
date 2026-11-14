@@ -18,7 +18,7 @@ pip install hondana-ja
 ## 使い方
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, dedupe, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -28,11 +28,12 @@ hyphenate("9784003101018")                           # '978-4-00-310101-8'（公
 book = lookup("9784003101018")                       # ネットワークに出ます。見つからなければ None
 book = lookup("9784003101018", merge=True)           # 欠けた項目を後続ソースで補完
 books = lookup_many(["978…", "978…"], rate=0.5)      # まとめて検索。rate は間隔（秒）
-print(book.title, book.source)
+print(book.title, book.source, book.ccode, book.ndc)  # ccode / ndc は openBD 由来。無ければ空
+hits = search("吾輩は猫である")                  # ISBN なし：NDL サーチと Open Library。fold() で順位付け
 print(to_bibtex(book))   # to_ris(book)、to_csl(book)、book.to_bibtex() も可
 ```
 
-CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `lookup 978…` ／ `lookup --merge --format table 978… 978…` ／ `lookup --format bibtex 978…`（`ris` / `csl` も可）／ `isbn --find < paper.txt | lookup`（標準入力から ISBN を読む。間隔は既定 0.5 秒、`--rate` で変更）／ `dedupe books.csv`（ISBN、または畳んだ書名+著者で重複グループを報告。`--unique clean.csv` で先頭表記を書き出す）
+CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `lookup 978…` ／ `lookup --merge --format table 978… 978…` ／ `lookup --format bibtex 978…`（`ris` / `csl` も可）／ `isbn --find < paper.txt | lookup`（標準入力から ISBN を読む。間隔は既定 0.5 秒、`--rate` で変更）／ `search "吾輩は猫である"`（書名・著者検索。`--title` / `--author` も可）／ `dedupe books.csv`（ISBN、または畳んだ書名+著者で重複グループを報告。`--unique clean.csv` で先頭表記を書き出す）
 
 ## `fold()` の中身
 
@@ -49,6 +50,6 @@ NFKC だけでは足りない理由は [docs/why-not-nfkc.md](docs/why-not-nfkc.
 
 ## ISBN 検索
 
-ソースごとに独立して試すので、一つがタイムアウトしても残りは続行します。`merge=True` は `order` の全ソースを問い合わせ、項目ごとに最初の非空値を採用します（`source` は `openBD+NDL` のように連結）。`lookup_many()` は入力順に一括検索し、`rate` で間隔（秒）を指定できます。`fetch(url, params, timeout) -> (status, text)` を渡せば、HTTP クライアントの差し替え・キャッシュ・テスト用スタブが自由です。メモリ上の簡易 TTL キャッシュは `lookup(isbn, fetch=cached(ttl=3600))` で使えます。
+ソースごとに独立して試すので、一つがタイムアウトしても残りは続行します。`merge=True` は `order` の全ソースを問い合わせ、項目ごとに最初の非空値を採用します（`source` は `openBD+NDL` のように連結）。`lookup_many()` は入力順に一括検索し、`rate` で間隔（秒）を指定できます。`fetch(url, params, timeout) -> (status, text)` を渡せば、HTTP クライアントの差し替え・キャッシュ・テスト用スタブが自由です。メモリ上の簡易 TTL キャッシュは `lookup(isbn, fetch=cached(ttl=3600))` で使えます。openBD に分類があれば `Book.ccode`（日本図書コードの C コード、先頭の C は付けない）と `Book.ndc` に入ります。ISBN がなく書名や著者だけで探すときは `search()` です。既定では国立国会図書館と Open Library を引き、結果を `fold()` で並べます。
 
 ロードマップ：[ROADMAP.md](ROADMAP.md) ・ MIT License

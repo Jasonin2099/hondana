@@ -1,8 +1,9 @@
-"""python -m hondana fold|isbn|lookup|dedupe …
+"""python -m hondana fold|isbn|lookup|search|dedupe …
 
   fold   — print the matching key for some text
   isbn   — find, validate and hyphenate ISBNs in text (no network)
   lookup — look ISBNs up across openBD / NDL / Google Books / Open Library
+  search — search by title or author (NDL Search, Open Library)
   dedupe — report (or drop) duplicate rows in a book-list CSV
 """
 from __future__ import annotations
@@ -16,7 +17,7 @@ from .isbn import find_isbns, hyphenate, is_valid, to_isbn13
 from .export import dumps
 from .lookup import Book
 from .dedupe import _AUTHOR_ALIASES, _ISBN_ALIASES, _TITLE_ALIASES, dedupe, resolve_field
-from . import fold, fold_steps, lookup_many
+from . import fold, fold_steps, lookup_many, search
 
 
 def _read_text(args_text: Sequence[str]) -> str:
@@ -140,6 +141,38 @@ def _cmd_lookup(a: argparse.Namespace) -> int:
     if not found:
         return 1
     return 1 if missing else 0
+
+
+def _cmd_search(a: argparse.Namespace) -> int:
+    query = " ".join(a.query) if a.query else ""
+    title, author = a.title or "", a.author or ""
+    if not query and not title and not author:
+        query = _read_text(()).strip()
+    if not query and not title and not author:
+        print("no query given", file=sys.stderr)
+        return 1
+    try:
+        books = search(
+            query,
+            title=title,
+            author=author,
+            limit=a.limit,
+            on_error=lambda n, e: print(f"# {n}: {type(e).__name__}", file=sys.stderr),
+        )
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    fmt = a.format or ("json" if len(books) == 1 else "table")
+    if not books:
+        print("no results", file=sys.stderr)
+        return 1
+    if fmt == "json":
+        print(json.dumps([b.to_dict() for b in books], ensure_ascii=False, indent=2))
+    elif fmt in ("bibtex", "ris", "csl"):
+        sys.stdout.write(dumps(books if len(books) > 1 else books[0], fmt))
+    else:
+        print(_format_table(books))
+    return 0
 
 
 def _cmd_dedupe(a: argparse.Namespace) -> int:
@@ -285,6 +318,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     d.add_argument("-o", "--output", metavar="FILE", help="write unique rows to FILE (implies --unique)")
 
 
+    s = sub.add_parser(
+        "search",
+        help="search by title or author (NDL Search, Open Library)",
+    )
+    s.add_argument("query", nargs="*", help="free-text query; reads stdin when omitted")
+    s.add_argument("--title", default="", help="search this title")
+    s.add_argument("--author", default="", help="search this author / creator")
+    s.add_argument("--limit", type=int, default=10, metavar="N", help="maximum hits (default 10)")
+    s.add_argument(
+        "--format", choices=("json", "table", "bibtex", "ris", "csl"), default=None,
+        help="output format (default: json for one hit, table for many)",
+    )
 
     a = p.parse_args(argv)
     if a.cmd == "fold":
@@ -293,6 +338,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _cmd_isbn(a)
     if a.cmd == "lookup":
         return _cmd_lookup(a)
+    if a.cmd == "search":
+        return _cmd_search(a)
     if a.cmd == "dedupe":
         return _cmd_dedupe(a)
     return 2
