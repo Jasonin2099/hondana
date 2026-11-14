@@ -23,7 +23,7 @@ from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, to_bibtex, 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
 to_isbn13("4-00-310101-4")                           # '9784003101018'
-hyphenate("9784003101018")                           # '978-4-00-310101-8' (978-0/1, 978-4, 978-7, 978-957/986)
+hyphenate("9784003101018")                           # '978-4-00-310101-8' (from the official ISBN range message, including 978-2/3/89 and 979-…; refresh with scripts/update_isbn_ranges.py)
 
 book = lookup("9784003101018")                       # hits the network; None if nobody knows it
 book = lookup("9784003101018", merge=True)           # fill missing fields from later sources

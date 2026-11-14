@@ -106,9 +106,11 @@ suspect = [line for line in refs.splitlines() if re.search(r"ISBN|ＩＳＢＮ",
 assert suspect == ["[4] 誤植のある例. ISBN 978-4-00-310101-9"]
 ```
 
-`hyphenate()` knows the Japan (978-4), English-language (978-0, 978-1), China
-(978-7) and Taiwan (978-957, 978-986) groups; other groups come back un-hyphenated
-rather than guessed.
+`hyphenate()` uses compact tables generated from the ISBN International
+Agency's RangeMessage.xml (Japan, English-language, China, Taiwan, and also
+978-2, 978-3, 978-89, 979-…, and the rest of the official groups). Unassigned
+ranges still come back un-hyphenated rather than guessed. Refresh the tables
+with `python3 scripts/update_isbn_ranges.py` (the XML itself is not vendored).
 
 ## Fill in missing metadata
 

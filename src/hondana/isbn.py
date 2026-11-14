@@ -106,58 +106,41 @@ def find_isbns(text: str) -> list[str]:
     return out
 
 
-# Registrant (publisher) ranges per registration group, transcribed from the ISBN
-# International range message (RangeMessage.xml; the China/Taiwan groups were
-# cross-checked against isbnlib's copy). Within a group the first digits after the group number decide how long the registrant code is.
-# Unassigned gaps are left out, so ISBNs falling there are not hyphenated.
-_RANGE_TEXT = {
-    "0": (  # English language
-        "00-19,200-227,2280-2289,229-368,3690-3699,370-638,6390-6397,"
-        "6398000-6399999,640-644,6450000-6459999,646-647,6480000-6489999,649-654,"
-        "6550-6559,656-699,7000-8499,85000-89999,900000-900370,9003710-9003719,"
-        "900372-949999,9500000-9999999"
-    ),
-    "1": (  # English language
-        "000-009,01-02,030-034,0350-0399,040-047,0480-0499,05-05,0670000-0699999,"
-        "0700-0999,100-397,3980-5499,55000-64999,6500-6799,68000-68599,6860-7139,"
-        "714-716,7170-7319,7320000-7399999,74000-76199,7620-7634,7635000-7649999,"
-        "76500-77499,7750000-7753999,77540-77639,7764000-7764999,77650-77699,"
-        "7770000-7782999,77830-78999,7900-7999,80000-80049,80050-80499,"
-        "80500-83799,8380000-8384999,83850-86719,8672-8675,86760-86979,"
-        "869800-915999,9160000-9165059,916506-916869,9168700-9169079,"
-        "916908-919163,9191640-9195649,919565-919599,9196000-9196549,"
-        "919655-972999,9730-9877,987800-991149,9911500-9911999,991200-998989,"
-        "9989900-9999999"
-    ),
-    "4": (  # Japan
-        "00-19,200-699,7000-8499,85000-89999,900000-949999,9500000-9999999"
-    ),
-    "7": (  # China (mainland)
-        "00-09,100-499,5000-7999,80000-89999,900000-999999"
-    ),
-    "957": (  # Taiwan
-        "00-02,0300-0499,05-19,2000-2099,21-27,28000-30999,31-43,440-819,"
-        "8200-9699,97000-99999"
-    ),
-    "986": (  # Taiwan
-        "00-05,06000-06999,0700-0799,08-11,120-539,5400-7999,80000-99999"
-    ),
-}
+# Registrant and registration-group ranges, derived from the ISBN International
+# Agency's RangeMessage.xml by scripts/update_isbn_ranges.py (the XML itself is
+# not vendored). Length 0 means the range is unassigned; those ISBNs are not
+# hyphenated. Re-run the script to refresh the tables when the agency updates
+# them. isbnlib ships a similar table; we generate our own to stay dependency-free.
+from ._isbn_ranges import GROUP_RULES, REGISTRANT_RULES
 
 
-def _parse_ranges(text: str) -> tuple[tuple[str, str], ...]:
-    pairs = (r.split("-") for r in text.split(","))
-    return tuple((lo, hi) for lo, hi in pairs)
+def _parse_rules(text: str) -> tuple[tuple[str, str, int], ...]:
+    out: list[tuple[str, str, int]] = []
+    if not text:
+        return ()
+    for part in text.split(","):
+        rng, _, length = part.partition(":")
+        lo, _, hi = rng.partition("-")
+        out.append((lo, hi, int(length)))
+    return tuple(out)
 
 
-_RANGES = {g: _parse_ranges(t) for g, t in _RANGE_TEXT.items()}
+_GROUP = {p: _parse_rules(t) for p, t in GROUP_RULES.items()}
+_REGISTRANT = {g: _parse_rules(t) for g, t in REGISTRANT_RULES.items()}
+
+
+def _rule_length(rules: tuple[tuple[str, str, int], ...], body7: str) -> int | None:
+    for lo, hi, n in rules:
+        if lo <= body7 <= hi:
+            return n
+    return None
 
 
 def hyphenate(raw: str | None) -> str:
     """Hyphenate an ISBN-13 by registration group and registrant code, e.g.
-    ``978-4-00-310101-8``. Covers 978-0 / 978-1 (English language), 978-4
-    (Japan), 978-7 (China) and 978-957 / 978-986 (Taiwan). Returns ``""`` for
-    invalid ISBNs, other groups and unassigned ranges.
+    ``978-4-00-310101-8``. Covers every group in the current ISBN range
+    message, including 978-2, 978-3, 978-89 and the 979-… prefixes. Returns
+    ``""`` for invalid ISBNs and unassigned ranges.
 
     >>> hyphenate("4003101014")
     '978-4-00-310101-8'
@@ -167,18 +150,28 @@ def hyphenate(raw: str | None) -> str:
     '978-0-13-110362-7'
     >>> hyphenate("9787020002207")
     '978-7-02-000220-7'
+    >>> hyphenate("9783161484100")
+    '978-3-16-148410-0'
+    >>> hyphenate("9791032300824")
+    '979-10-323-0082-4'
     """
     s = to_isbn13(raw, strict=True)
-    if not s.startswith("978"):
+    if len(s) != 13:
         return ""
-    # Group codes are prefix-free, so at most one of these matches.
-    group = next((g for g in _RANGES if s[3:].startswith(g)), None)
-    if group is None:
+    prefix = s[:3]
+    group_rules = _GROUP.get(prefix)
+    if not group_rules:
         return ""
-    ranges = _RANGES[group]
-    body = s[3 + len(group):12]
-    for lo, hi in ranges:
-        if lo <= body[: len(lo)] <= hi:
-            n = len(lo)
-            return f"978-{group}-{body[:n]}-{body[n:]}-{s[12]}"
-    return ""
+    group_len = _rule_length(group_rules, s[3:10])
+    if not group_len:
+        return ""
+    group = s[3:3 + group_len]
+    rest = s[3 + group_len:12]
+    body7 = (rest + "0000000")[:7]
+    registrant_rules = _REGISTRANT.get(f"{prefix}-{group}")
+    if not registrant_rules:
+        return ""
+    registrant_len = _rule_length(registrant_rules, body7)
+    if not registrant_len:
+        return ""
+    return f"{prefix}-{group}-{rest[:registrant_len]}-{rest[registrant_len:]}-{s[12]}"

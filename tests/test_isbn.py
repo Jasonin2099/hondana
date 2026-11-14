@@ -101,7 +101,88 @@ def test_hyphenate_chinese_groups():
 
 def test_hyphenate_other_groups_and_invalid():
     from hondana import hyphenate
-    assert hyphenate("9783161484100") == ""   # 978-3 (German) not covered
-    assert hyphenate("9791032300824") == ""   # 979 prefix not covered
+    assert hyphenate("9783161484100") == "978-3-16-148410-0"   # German 978-3
+    assert hyphenate("9782266111560") == "978-2-266-11156-0"   # French 978-2
+    assert hyphenate("9791032300824") == "979-10-323-0082-4"   # France 979-10
     assert hyphenate("9784003101019") == ""   # bad check digit
     assert hyphenate("") == ""
+
+
+def _check13(core12: str) -> str:
+    return str((10 - sum(int(c) * (1 if i % 2 == 0 else 3) for i, c in enumerate(core12)) % 10) % 10)
+
+
+def test_hyphenate_korea_and_979():
+    from hondana import hyphenate, is_valid
+    # 978-89, 2-digit registrant (00-24)
+    core = "978891234567"
+    isbn = core + _check13(core)
+    assert is_valid(isbn)
+    assert hyphenate(isbn) == "978-89-12-34567-" + isbn[-1]
+    # 978-89, 3-digit registrant (250-549)
+    core = "978892501234"
+    isbn = core + _check13(core)
+    assert hyphenate(isbn) == "978-89-250-1234-" + isbn[-1]
+
+
+def test_hyphenate_unassigned_range():
+    from hondana import hyphenate, is_valid
+    # 979-0 is not a registration group (length 0 in the EAN 979 prefix rules)
+    core = "979012345678"
+    isbn = core + _check13(core)
+    assert is_valid(isbn)
+    assert hyphenate(isbn) == ""
+
+
+def test_parse_range_message_fixture(tmp_path):
+    import importlib.util
+    from pathlib import Path
+    script = Path(__file__).resolve().parents[1] / "scripts" / "update_isbn_ranges.py"
+    spec = importlib.util.spec_from_file_location("update_isbn_ranges", script)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    xml = """<?xml version="1.0" encoding="utf-8"?>
+<ISBNRangeMessage>
+  <MessageSerialNumber>test-serial</MessageSerialNumber>
+  <MessageDate>Sat, 14 Nov 2026 00:00:00 UTC</MessageDate>
+  <EAN.UCCPrefixes>
+    <EAN.UCC>
+      <Prefix>978</Prefix>
+      <Agency>International ISBN Agency</Agency>
+      <Rules>
+        <Rule><Range>0000000-5999999</Range><Length>1</Length></Rule>
+        <Rule><Range>6000000-9999999</Range><Length>0</Length></Rule>
+      </Rules>
+    </EAN.UCC>
+    <EAN.UCC>
+      <Prefix>979</Prefix>
+      <Agency>International ISBN Agency</Agency>
+      <Rules>
+        <Rule><Range>0000000-9999999</Range><Length>2</Length></Rule>
+      </Rules>
+    </EAN.UCC>
+  </EAN.UCCPrefixes>
+  <RegistrationGroups>
+    <Group>
+      <Prefix>978-4</Prefix>
+      <Agency>Japan</Agency>
+      <Rules>
+        <Rule><Range>0000000-1999999</Range><Length>2</Length></Rule>
+        <Rule><Range>2000000-9999999</Range><Length>0</Length></Rule>
+      </Rules>
+    </Group>
+  </RegistrationGroups>
+</ISBNRangeMessage>
+"""
+    date, serial, group_rules, registrant_rules = mod.parse_range_message(xml)
+    assert date.startswith("Sat, 14 Nov 2026")
+    assert serial == "test-serial"
+    assert group_rules["978"][0] == ("0000000", "5999999", 1)
+    assert registrant_rules["978-4"][0] == ("0000000", "1999999", 2)
+    out = tmp_path / "_isbn_ranges.py"
+    out.write_text(mod.render_module((date, serial, group_rules, registrant_rules)), encoding="utf-8")
+    ns: dict = {}
+    exec(out.read_text(encoding="utf-8"), ns)
+    assert ns["MESSAGE_SERIAL"] == "test-serial"
+    assert "978-4" in ns["REGISTRANT_RULES"]
