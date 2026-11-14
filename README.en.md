@@ -18,7 +18,7 @@ pip install hondana-ja
 ## Use
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, dedupe, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -32,7 +32,7 @@ print(book.title, book.source)
 print(to_bibtex(book))   # or to_ris(book), to_csl(book); also book.to_bibtex()
 ```
 
-CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `lookup 978…` · `lookup --merge --format table 978… 978…` · `lookup --format bibtex 978…` (also `ris` / `csl`) · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change)
+CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `lookup 978…` · `lookup --merge --format table 978… 978…` · `lookup --format bibtex 978…` (also `ris` / `csl`) · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change) · `dedupe books.csv` (duplicate groups by ISBN or folded title + author; `--unique clean.csv` writes the first spelling of each)
 
 ## What `fold()` does
 

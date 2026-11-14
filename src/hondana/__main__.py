@@ -1,8 +1,9 @@
-"""python -m hondana fold|isbn|lookup …
+"""python -m hondana fold|isbn|lookup|dedupe …
 
   fold   — print the matching key for some text
   isbn   — find, validate and hyphenate ISBNs in text (no network)
   lookup — look ISBNs up across openBD / NDL / Google Books / Open Library
+  dedupe — report (or drop) duplicate rows in a book-list CSV
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from typing import List, Optional, Sequence
 from .isbn import find_isbns, hyphenate, is_valid, to_isbn13
 from .export import dumps
 from .lookup import Book
+from .dedupe import _AUTHOR_ALIASES, _ISBN_ALIASES, _TITLE_ALIASES, dedupe, resolve_field
 from . import fold, fold_steps, lookup_many
 
 
@@ -140,6 +142,96 @@ def _cmd_lookup(a: argparse.Namespace) -> int:
     return 1 if missing else 0
 
 
+def _cmd_dedupe(a: argparse.Namespace) -> int:
+    import csv
+    from pathlib import Path
+
+    source = a.file
+    close = False
+    if source is None or source == "-":
+        stream = sys.stdin
+    else:
+        stream = open(source, encoding="utf-8-sig", newline="")
+        close = True
+    try:
+        reader = csv.DictReader(stream)
+        if not reader.fieldnames:
+            print("no CSV header", file=sys.stderr)
+            return 1
+        rows = list(reader)
+    finally:
+        if close:
+            stream.close()
+
+    try:
+        result = dedupe(rows, isbn_field=a.isbn, title_field=a.title, author_field=a.author)
+    except KeyError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+
+    isbn_f = resolve_field(rows, _ISBN_ALIASES, a.isbn) if rows else a.isbn
+    title_f = resolve_field(rows, _TITLE_ALIASES, a.title) if rows else a.title
+    author_f = resolve_field(rows, _AUTHOR_ALIASES, a.author) if rows else a.author
+
+    if a.unique is not None or a.output:
+        dest = a.output or a.unique or "-"
+        close_out = False
+        if dest == "-":
+            out = sys.stdout
+        else:
+            Path(dest).parent.mkdir(parents=True, exist_ok=True)
+            out = open(dest, "w", encoding="utf-8", newline="")
+            close_out = True
+        try:
+            fields = list(rows[0].keys()) if rows else ["title", "author", "isbn"]
+            writer = csv.DictWriter(out, fieldnames=fields, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(result.unique)
+        finally:
+            if close_out:
+                out.close()
+        print(
+            f"{len(result)} unique / {len(rows)} rows ({result.extra} dropped)",
+            file=sys.stderr,
+        )
+        return 0
+
+    if a.json:
+        groups = result.groups if a.all else result.duplicate_groups
+        payload = {
+            "rows": len(rows),
+            "unique": len(result),
+            "extra": result.extra,
+            "groups": [
+                {"kind": g.kind, "key": list(g.key), "count": len(g.rows), "rows": [dict(r) for r in g.rows]}
+                for g in groups
+            ],
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
+    dups = result.duplicate_groups
+    if not dups:
+        print(f"{len(rows)} rows, no duplicates")
+        return 0
+
+    def cells(row: dict[str, str]) -> str:
+        parts = [
+            str(row.get(title_f) or "").strip() if title_f else "",
+            str(row.get(author_f) or "").strip() if author_f else "",
+            str(row.get(isbn_f) or "").strip() if isbn_f else "",
+        ]
+        return " / ".join(p for p in parts if p) or "(empty)"
+
+    for i, g in enumerate(dups, 1):
+        label = f"isbn {g.isbn}" if g.kind == "isbn" else "title+author"
+        print(f"group {i} ({label}), {len(g.rows)} rows")
+        for row in g.rows:
+            print(f"  {cells(dict(row))}")
+    print(f"{len(result)} unique, {len(dups)} duplicate groups ({result.extra} extra rows)")
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="hondana")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -177,6 +269,23 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="output format (default: json for one ISBN, table for many)",
     )
 
+
+    d = sub.add_parser(
+        "dedupe",
+        help="report duplicate rows in a book-list CSV (ISBN or folded title + author)",
+    )
+    d.add_argument("file", nargs="?", help="CSV path; reads stdin when omitted or given as -")
+    d.add_argument("--isbn", metavar="COL", help="ISBN column (default: autodetect isbn / ISBN-13 / …)")
+    d.add_argument("--title", metavar="COL", help="title column (default: autodetect title / 書名 / …)")
+    d.add_argument("--author", metavar="COL", help="author column (default: autodetect author / 著者 / …)")
+    d.add_argument("--json", action="store_true", help="structured JSON of duplicate groups")
+    d.add_argument("--all", action="store_true", help="with --json, include singleton groups too")
+    d.add_argument("--unique", nargs="?", const="-", metavar="FILE",
+                   help="write unique rows (first spelling wins) to FILE, or stdout when FLAG only")
+    d.add_argument("-o", "--output", metavar="FILE", help="write unique rows to FILE (implies --unique)")
+
+
+
     a = p.parse_args(argv)
     if a.cmd == "fold":
         return _cmd_fold(a)
@@ -184,6 +293,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _cmd_isbn(a)
     if a.cmd == "lookup":
         return _cmd_lookup(a)
+    if a.cmd == "dedupe":
+        return _cmd_dedupe(a)
     return 2
 
 

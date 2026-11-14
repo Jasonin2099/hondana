@@ -23,7 +23,7 @@ pip install hondana-ja
 ## 用法
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, dedupe, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -48,6 +48,7 @@ python -m hondana lookup 9784003101018          # 联网查询（JSON）
 python -m hondana lookup --merge --format table 978… 978…
 python -m hondana lookup --format bibtex 9784003101018   # 也可 ris / csl
 python -m hondana isbn --find < paper.txt | python -m hondana lookup   # 从 stdin 读 ISBN，默认每次间隔 0.5 秒（--rate 可改）
+python -m hondana dedupe books.csv           # 按 ISBN 或折叠后的书名+作者报告重复组；--unique clean.csv 写出去重结果
 ```
 
 ## `fold()` 做了什么

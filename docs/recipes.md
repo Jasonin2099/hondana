@@ -20,7 +20,7 @@ display.
 
 ```python
 import csv, io
-from hondana import fold, to_isbn13
+from hondana import dedupe
 
 data = """title,author,isbn
 吾輩は猫である,夏目漱石,4-00-310101-4
@@ -30,30 +30,27 @@ data = """title,author,isbn
 「坊っちゃん」,夏目漱石,
 """
 
-def key(row):
-    isbn = to_isbn13(row["isbn"], strict=True)   # '' for empty or bad check digit
-    if isbn:
-        return ("isbn", isbn)
-    return ("text", fold(row["title"]), fold(row["author"]))
-
-seen = {}
-for row in csv.DictReader(io.StringIO(data)):
-    seen.setdefault(key(row), row)                # first spelling wins
-
-titles = [r["title"] for r in seen.values()]
+result = dedupe(csv.DictReader(io.StringIO(data)))
+titles = [r["title"] for r in result.unique]
 assert titles == ["吾輩は猫である", "ﾊﾘｰ･ﾎﾟｯﾀｰと賢者の石", "「坊っちゃん」"]
+assert result.extra == 2
 ```
 
 Notes:
 
-- `to_isbn13(..., strict=True)` returns `""` for a typo'd check digit instead of
-  silently "fixing" it, so a wrong ISBN never merges two different books. Rows
-  with a bad ISBN fall back to the text key; flag them with `is_valid()` if you
-  want to review them.
-- `吾輩ハ猫デアル` and `吾輩は猫である` only fold together because the first row
-  carried an ISBN. Text keys match spelling variants, not different wording.
-- For a looser match add opt-ins: `fold(s, small_kana=True, itaiji=True,
-  iteration_marks="expand")`. Use the same options on both sides.
+- A valid ISBN (strict check digit) groups rows together; otherwise the key is
+  the folded title + author. A row with an ISBN also joins any text-only row
+  with the same folded title + author, so `吾輩ハ猫デアル` without an ISBN still
+  meets `吾輩は猫である`.
+- `to_isbn13(..., strict=True)` is used under the hood, so a typo'd check digit
+  never merges two different books — those rows fall back to the text key.
+  Flag them with `is_valid()` if you want to review them.
+- Text keys match spelling variants, not different wording.
+- For a looser match pass the same `fold()` opt-ins through to `dedupe`
+  (`small_kana=True`, `itaiji=True`, `iteration_marks="expand"`, …).
+- From the shell: `python -m hondana dedupe books.csv` reports the groups;
+  `python -m hondana dedupe books.csv --unique clean.csv` writes the first
+  spelling of each. Column names like `書名` / `著者` / `ISBN` are detected.
 
 ## Search a catalogue the way people type
 

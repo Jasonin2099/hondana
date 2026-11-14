@@ -18,7 +18,7 @@ pip install hondana-ja
 ## 使い方
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, dedupe, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -32,7 +32,7 @@ print(book.title, book.source)
 print(to_bibtex(book))   # to_ris(book)、to_csl(book)、book.to_bibtex() も可
 ```
 
-CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `lookup 978…` ／ `lookup --merge --format table 978… 978…` ／ `lookup --format bibtex 978…`（`ris` / `csl` も可）／ `isbn --find < paper.txt | lookup`（標準入力から ISBN を読む。間隔は既定 0.5 秒、`--rate` で変更）
+CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `lookup 978…` ／ `lookup --merge --format table 978… 978…` ／ `lookup --format bibtex 978…`（`ris` / `csl` も可）／ `isbn --find < paper.txt | lookup`（標準入力から ISBN を読む。間隔は既定 0.5 秒、`--rate` で変更）／ `dedupe books.csv`（ISBN、または畳んだ書名+著者で重複グループを報告。`--unique clean.csv` で先頭表記を書き出す）
 
 ## `fold()` の中身
 
