@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-24.04]
         python: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
         include:
           - os: windows-latest
@@ -25,7 +25,7 @@ jobs:
       - run: python -m pytest -q --doctest-modules src tests
       - run: python -m hondana fold "ﾊﾘｰ・ﾎﾟｯﾀｰと圖書館"
   types:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
