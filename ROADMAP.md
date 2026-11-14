@@ -43,4 +43,4 @@ Research existing tools first (bibtex/CSL libraries, isbnlib range data) before 
 - [x] ISBN: generate hyphenation ranges from the ISBN International RangeMessage.xml (covers 978-3, 978-2, 978-89, 979-…), with an update script
 - [x] Lookup: search by title / author without ISBN (NDL Search, Open Library), results ranked with `fold()`
 - [x] openBD: parse Japanese C-code and NDC into optional `Book` fields
-- [ ] Release 0.3.0 (GitHub Release → PyPI)
+- [x] Release 0.3.0 (GitHub Release → PyPI)

@@ -5,7 +5,7 @@ from .export import dumps, to_bibtex, to_csl, to_ris
 from .lookup import Book, cached, lookup, lookup_many, search
 from .dedupe import DuplicateGroup, DedupeResult, dedupe, dedupe_key
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = [
     "fold", "fold_steps", "kata_to_hira", "hira_to_kata", "to_shinjitai", "width", "strip_reading_lines",
     "is_valid", "to_isbn13", "to_isbn10", "find_isbns", "hyphenate",
