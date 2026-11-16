@@ -6,7 +6,7 @@ Small, dependency-free Python helpers for matching Japanese / CJK book metadata.
 
 If you've built book search you've seen it: the user types `图书馆`, the record says `圖書館`; someone types `ﾊﾘｰ ﾎﾟｯﾀｰ`, the title is `ハリー・ポッター`. hondana folds these into one comparison key. It also ships a tiny ISBN lookup that falls back openBD → NDL Search → Google Books → Open Library.
 
-> Early skeleton: the character tables are a small starter set — enough to show the idea, not full coverage. Pairs welcome.
+> The character tables cover many common titles and names, but they are not complete. Further pairs are welcome.
 
 ## Install
 

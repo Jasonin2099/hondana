@@ -44,3 +44,33 @@ Research existing tools first (bibtex/CSL libraries, isbnlib range data) before 
 - [x] Lookup: search by title / author without ISBN (NDL Search, Open Library), results ranked with `fold()`
 - [x] openBD: parse Japanese C-code and NDC into optional `Book` fields
 - [x] Release 0.3.0 (GitHub Release → PyPI)
+
+## Batch 4 (proposal — not approved)
+
+A draft for the next slice after 0.3.0. Nothing here will be implemented until it is
+approved (and a release still needs a separate OK). The list stays inside what
+hondana already does — folding, ISBN, lookup, export — and reuses data we already
+fetch or tables that are publicly documented. Existing tools were checked first
+so we do not grow a citeproc, a full BibTeX parser, or a holdings search.
+
+- [ ] Decode the Japanese C-code (`Book.ccode`, already parsed from openBD) into
+      the four published fields of the 日本図書コード (販売対象 / 発行形態 / 内容 /
+      内容細目), as a small bundled table. Show the labels in the CLI and on `Book`.
+- [ ] NDC class *labels* for the 10 main classes only (0 総記 … 9 産業). The full
+      NDC schedules are copyrighted by the Japan Library Association, so this
+      would not bundle divisions or the complete outline.
+- [ ] Surface the cover URL that openBD already returns (`summary.cover`) as
+      `Book.cover`. Do not download the image.
+- [ ] Import the formats we already export: `from_bibtex` / `from_ris` / `from_csl`
+      (and CLI) for the fields hondana itself writes. Stay zero-dependency; a
+      conservative subset, not a general BibTeX implementation (bibtexparser /
+      rispy already exist for the general case).
+- [ ] Optional Japan Search (ジャパンサーチ) source for `search()` / `lookup()`,
+      after checking the API terms. Complements NDL; no holdings / Calil.
+- [ ] When hyphenating an ISBN, also print the registration-group name (Japan,
+      English-language, …). The official RangeMessage table we already ship
+      has the group data.
+
+Citation *formatting* (APA, Chicago, …) should stay a recipe that pipes
+CSL-JSON to pandoc or citeproc, not a new formatter in this library.
+
