@@ -132,3 +132,27 @@ def test_cli_stdin(monkeypatch, capsys):
     )
     assert main(["dedupe"]) == 0
     assert "1 unique, 1 duplicate groups" in capsys.readouterr().out
+
+
+def test_resolve_field_explicit_and_aliases():
+    import pytest
+    from hondana.dedupe import resolve_field
+    rows = [{"Book Title": "x", "ISBN": "1", "著者": "y"}]
+    # explicit name: exact, then case / space-insensitive
+    assert resolve_field(rows, ["title"], "Book Title") == "Book Title"
+    assert resolve_field(rows, ["title"], "book_title") == "Book Title"
+    assert resolve_field(rows, [], "isbn") == "ISBN"
+    # aliases are tried in order; exact before normalised
+    assert resolve_field(rows, ["author", "著者"], None) == "著者"
+    assert resolve_field(rows, ["isbn13", "isbn"], None) == "ISBN"
+    assert resolve_field(rows, ["publisher"], None) is None
+    # an explicit column that does not exist names the columns we do have
+    with pytest.raises(KeyError) as e:
+        resolve_field(rows, [], "year")
+    assert "Book Title" in str(e.value) and "ISBN" in str(e.value)
+
+
+def test_resolve_field_without_rows_returns_explicit():
+    from hondana.dedupe import resolve_field
+    assert resolve_field([], ["title"], "Title") == "Title"
+    assert resolve_field([], ["title"], None) is None
