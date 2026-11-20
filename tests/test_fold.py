@@ -276,3 +276,21 @@ def test_cli_kana_option(capsys):
     assert capsys.readouterr().out.strip() == "ハリ"
     assert main(["fold", "--kana", "off", "はりーハリー"]) == 0
     assert capsys.readouterr().out.strip() == "はりハリ"
+
+
+@pytest.mark.parametrize("a,b", [
+    ("髙橋", "高橋"), ("山﨑", "山崎"), ("宮嵜", "宮崎"), ("𠮷田", "吉田"),
+    ("渡邉", "渡辺"), ("濵田", "浜田"), ("栁田", "柳田"), ("冨田", "富田"),
+])
+def test_fold_itaiji_names(a, b):
+    from hondana.fold import fold_itaiji
+    assert fold_itaiji(a) == b
+    # already-standard text is left alone, so folding twice changes nothing
+    assert fold_itaiji(b) == b
+    assert fold_itaiji(fold_itaiji(a)) == b
+
+
+def test_fold_itaiji_keeps_other_text():
+    from hondana.fold import fold_itaiji
+    s = "ハリー・ポッターと賢者の石 ISBN 978-4"
+    assert fold_itaiji(s) == s
