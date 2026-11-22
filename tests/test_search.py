@@ -189,6 +189,23 @@ def test_lookup_fills_ccode_and_ndc():
     assert d["ccode"] == "3055" and d["ndc"] == "007.64"
 
 
+def test_lookup_ccode_labels_in_json():
+    b = lookup(ISBN, fetch=fake({"openbd": OBD_CLASSIFIED}))
+    assert b is not None and b.ccode_info is not None
+    assert b.to_dict()["ccode_labels"]["detail"] == "電子通信"
+
+
+def test_openbd_cover_url_is_surfaced_as_https():
+    payload = (200, json.dumps([{
+        "summary": {"title": "Dummy", "author": "A", "publisher": "P", "pubdate": "2020",
+                    "cover": "http://cover.openbd.jp/9784003101018.jpg"},
+    }]))
+    b = lookup(ISBN, fetch=fake({"openbd": payload}))
+    assert b is not None and b.source == "openBD"
+    assert b.cover == "https://cover.openbd.jp/9784003101018.jpg"
+    assert b.to_dict()["cover"] == b.cover
+
+
 def test_lookup_ccode_from_hanmoto_fallback():
     payload = (200, json.dumps([{
         "summary": {"title": "Dummy", "author": "A", "publisher": "P", "pubdate": "2020", "cover": ""},

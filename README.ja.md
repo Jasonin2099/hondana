@@ -18,22 +18,25 @@ pip install hondana-ja
 ## 使い方
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
 to_isbn13("4-00-310101-4")                           # '9784003101018'
 hyphenate("9784003101018")                           # '978-4-00-310101-8'（公式の ISBN レンジメッセージに基づく。978-2 / 978-3 / 978-89、979-… も含む。更新は scripts/update_isbn_ranges.py）
+registration_group("9784003101018")                  # ('978-4', 'Japan')（同じレンジメッセージの登録グループ名。英語表記）
+decode_ccode("C0093")                                 # CCode(code='0093', audience='一般', form='単行本', subject='文学', detail='日本文学、小説・物語')
 
 book = lookup("9784003101018")                       # ネットワークに出ます。見つからなければ None
 book = lookup("9784003101018", merge=True)           # 欠けた項目を後続ソースで補完
 books = lookup_many(["978…", "978…"], rate=0.5)      # まとめて検索。rate は間隔（秒）
 print(book.title, book.source, book.ccode, book.ndc)  # ccode / ndc は openBD 由来。無ければ空
+print(book.ccode_info, book.cover)  # C コードの解読（to_dict() では ccode_labels）。cover は openBD などの書影 URL（画像はダウンロードしない）
 hits = search("吾輩は猫である")                  # ISBN なし：NDL サーチと Open Library。fold() で順位付け
 print(to_bibtex(book))   # to_ris(book)、to_csl(book)、book.to_bibtex() も可
 ```
 
-CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `lookup 978…` ／ `lookup --merge --format table 978… 978…` ／ `lookup --format bibtex 978…`（`ris` / `csl` も可）／ `isbn --find < paper.txt | lookup`（標準入力から ISBN を読む。間隔は既定 0.5 秒、`--rate` で変更）／ `search "吾輩は猫である"`（書名・著者検索。`--title` / `--author` も可）／ `dedupe books.csv`（ISBN、または畳んだ書名+著者で重複グループを報告。`--unique clean.csv` で先頭表記を書き出す）
+CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `isbn --group 978…`（登録グループ名をタブ区切りで併記。`--json` では `group` / `group_name`）／ `ccode C0093 3055`（C コードを販売対象・発行形態・内容に解読、ネット不要）／ `lookup 978…` ／ `lookup --merge --format table 978… 978…` ／ `lookup --format bibtex 978…`（`ris` / `csl` も可）／ `isbn --find < paper.txt | lookup`（標準入力から ISBN を読む。間隔は既定 0.5 秒、`--rate` で変更）／ `search "吾輩は猫である"`（書名・著者検索。`--title` / `--author` も可）／ `dedupe books.csv`（ISBN、または畳んだ書名+著者で重複グループを報告。`--unique clean.csv` で先頭表記を書き出す）
 
 ## `fold()` の中身
 
@@ -50,6 +53,6 @@ NFKC だけでは足りない理由は [docs/why-not-nfkc.md](docs/why-not-nfkc.
 
 ## ISBN 検索
 
-ソースごとに独立して試すので、一つがタイムアウトしても残りは続行します。`merge=True` は `order` の全ソースを問い合わせ、項目ごとに最初の非空値を採用します（`source` は `openBD+NDL` のように連結）。`lookup_many()` は入力順に一括検索し、`rate` で間隔（秒）を指定できます。`fetch(url, params, timeout) -> (status, text)` を渡せば、HTTP クライアントの差し替え・キャッシュ・テスト用スタブが自由です。メモリ上の簡易 TTL キャッシュは `lookup(isbn, fetch=cached(ttl=3600))` で使えます。openBD に分類があれば `Book.ccode`（日本図書コードの C コード、先頭の C は付けない）と `Book.ndc` に入ります。ISBN がなく書名や著者だけで探すときは `search()` です。既定では国立国会図書館と Open Library を引き、結果を `fold()` で並べます。
+ソースごとに独立して試すので、一つがタイムアウトしても残りは続行します。`merge=True` は `order` の全ソースを問い合わせ、項目ごとに最初の非空値を採用します（`source` は `openBD+NDL` のように連結）。`lookup_many()` は入力順に一括検索し、`rate` で間隔（秒）を指定できます。`fetch(url, params, timeout) -> (status, text)` を渡せば、HTTP クライアントの差し替え・キャッシュ・テスト用スタブが自由です。メモリ上の簡易 TTL キャッシュは `lookup(isbn, fetch=cached(ttl=3600))` で使えます。openBD に分類があれば `Book.ccode`（日本図書コードの C コード、先頭の C は付けない）と `Book.ndc` に入ります。`decode_ccode()` / `Book.ccode_info` は C コードを販売対象・発行形態・内容（大分類・中分類）のラベルに変換します。表は日本図書コード管理センター『利用の手引き 2025年版』p.24 の分類記号一覧表に準拠し、空欄（リザーブ）の中分類は `detail` が空になります。C コードは出版者が選ぶ棚分けの目安で、図書館の分類ではありません。ISBN がなく書名や著者だけで探すときは `search()` です。既定では国立国会図書館と Open Library を引き、結果を `fold()` で並べます。
 
 ロードマップ：[ROADMAP.md](ROADMAP.md) ・ MIT License

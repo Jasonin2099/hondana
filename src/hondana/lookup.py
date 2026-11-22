@@ -24,6 +24,7 @@ import urllib.request
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
+from .ccode import CCode, decode_ccode
 from .isbn import to_isbn13
 from .fold import fold
 
@@ -102,10 +103,20 @@ class Book:
     def __bool__(self) -> bool:
         return bool(self.title)
 
-    def to_dict(self) -> "dict[str, str]":
-        d = asdict(self)
+    @property
+    def ccode_info(self) -> Optional[CCode]:
+        """``ccode`` decoded into 販売対象 / 発行形態 / 内容 labels, or ``None``."""
+        return decode_ccode(self.ccode)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Fields as a dict. When ``ccode`` decodes, ``ccode_labels`` holds the
+        audience / form / subject / detail labels (not part of the dataclass)."""
+        d: Dict[str, Any] = asdict(self)
         if d["raw"] is None:
             del d["raw"]
+        info = self.ccode_info
+        if info is not None:
+            d["ccode_labels"] = {k: v for k, v in info._asdict().items() if k != "code"}
         return d
 
     def to_bibtex(self) -> str:

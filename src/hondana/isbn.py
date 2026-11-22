@@ -4,7 +4,10 @@ from __future__ import annotations
 import re
 import unicodedata
 
-__all__ = ["clean", "is_valid", "to_isbn13", "to_isbn10", "find_isbns", "hyphenate"]
+__all__ = [
+    "clean", "is_valid", "to_isbn13", "to_isbn10", "find_isbns", "hyphenate",
+    "registration_group",
+]
 
 _NON = re.compile(r"[^0-9Xx]")
 
@@ -111,7 +114,7 @@ def find_isbns(text: str) -> list[str]:
 # not vendored). Length 0 means the range is unassigned; those ISBNs are not
 # hyphenated. Re-run the script to refresh the tables when the agency updates
 # them. isbnlib ships a similar table; we generate our own to stay dependency-free.
-from ._isbn_ranges import GROUP_RULES, REGISTRANT_RULES
+from ._isbn_ranges import GROUP_NAMES, GROUP_RULES, REGISTRANT_RULES
 
 
 def _parse_rules(text: str) -> tuple[tuple[str, str, int], ...]:
@@ -136,6 +139,46 @@ def _rule_length(rules: tuple[tuple[str, str, int], ...], body7: str) -> int | N
     return None
 
 
+def _group_of(raw: str | None) -> tuple[str, str] | None:
+    """Return (validated ISBN-13, registration group like ``"978-4"``)."""
+    s = to_isbn13(raw, strict=True)
+    if len(s) != 13:
+        return None
+    group_rules = _GROUP.get(s[:3])
+    if not group_rules:
+        return None
+    group_len = _rule_length(group_rules, s[3:10])
+    if not group_len:
+        return None
+    return s, f"{s[:3]}-{s[3:3 + group_len]}"
+
+
+def registration_group(raw: str | None) -> tuple[str, str] | None:
+    """Return the registration group of an ISBN and its name from the range
+    message, e.g. ``("978-4", "Japan")``. ``None`` for invalid ISBNs and
+    unassigned groups. The name is the agency label used by the International
+    ISBN Agency (a country, region or language area, in English).
+
+    >>> registration_group("4003101014")
+    ('978-4', 'Japan')
+    >>> registration_group("9780131103627")
+    ('978-0', 'English language')
+    >>> registration_group("9789571234564")
+    ('978-957', 'Taiwan')
+    >>> registration_group("9798350000009")
+    ('979-8', 'United States')
+    >>> registration_group("9784003101019") is None   # bad check digit
+    True
+    """
+    found = _group_of(raw)
+    if found is None:
+        return None
+    group = found[1]
+    if group not in _REGISTRANT:
+        return None
+    return group, GROUP_NAMES.get(group, "")
+
+
 def hyphenate(raw: str | None) -> str:
     """Hyphenate an ISBN-13 by registration group and registrant code, e.g.
     ``978-4-00-310101-8``. Covers every group in the current ISBN range
@@ -155,23 +198,16 @@ def hyphenate(raw: str | None) -> str:
     >>> hyphenate("9791032300824")
     '979-10-323-0082-4'
     """
-    s = to_isbn13(raw, strict=True)
-    if len(s) != 13:
+    found = _group_of(raw)
+    if found is None:
         return ""
-    prefix = s[:3]
-    group_rules = _GROUP.get(prefix)
-    if not group_rules:
-        return ""
-    group_len = _rule_length(group_rules, s[3:10])
-    if not group_len:
-        return ""
-    group = s[3:3 + group_len]
-    rest = s[3 + group_len:12]
+    s, group = found
+    rest = s[len(group) - 1:12]
     body7 = (rest + "0000000")[:7]
-    registrant_rules = _REGISTRANT.get(f"{prefix}-{group}")
+    registrant_rules = _REGISTRANT.get(group)
     if not registrant_rules:
         return ""
     registrant_len = _rule_length(registrant_rules, body7)
     if not registrant_len:
         return ""
-    return f"{prefix}-{group}-{rest[:registrant_len]}-{rest[registrant_len:]}-{s[12]}"
+    return f"{group}-{rest[:registrant_len]}-{rest[registrant_len:]}-{s[12]}"

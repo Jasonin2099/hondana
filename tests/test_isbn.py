@@ -175,14 +175,53 @@ def test_parse_range_message_fixture(tmp_path):
   </RegistrationGroups>
 </ISBNRangeMessage>
 """
-    date, serial, group_rules, registrant_rules = mod.parse_range_message(xml)
+    date, serial, group_rules, registrant_rules, group_names = mod.parse_range_message(xml)
     assert date.startswith("Sat, 14 Nov 2026")
     assert serial == "test-serial"
     assert group_rules["978"][0] == ("0000000", "5999999", 1)
     assert registrant_rules["978-4"][0] == ("0000000", "1999999", 2)
     out = tmp_path / "_isbn_ranges.py"
-    out.write_text(mod.render_module((date, serial, group_rules, registrant_rules)), encoding="utf-8")
+    assert group_names == {"978-4": "Japan"}
+    out.write_text(
+        mod.render_module((date, serial, group_rules, registrant_rules, group_names)), encoding="utf-8"
+    )
     ns: dict = {}
     exec(out.read_text(encoding="utf-8"), ns)
     assert ns["MESSAGE_SERIAL"] == "test-serial"
     assert "978-4" in ns["REGISTRANT_RULES"]
+    assert ns["GROUP_NAMES"] == {"978-4": "Japan"}
+
+
+def test_registration_group_names():
+    from hondana import registration_group
+    assert registration_group("4003101014") == ("978-4", "Japan")
+    assert registration_group("978-4-87311-778-2") == ("978-4", "Japan")
+    assert registration_group("0131103628") == ("978-0", "English language")
+    assert registration_group("9783161484100") == ("978-3", "German language")
+    assert registration_group("9787020002207") == ("978-7", "China, People's Republic")
+    assert registration_group("9789861234564") == ("978-986", "Taiwan")
+    assert registration_group("9791032300824") == ("979-10", "France")
+
+
+def test_registration_group_invalid_and_unassigned():
+    from hondana import registration_group
+    assert registration_group("") is None
+    assert registration_group(None) is None
+    assert registration_group("9784003101019") is None  # wrong check digit
+    core = "979012345678"  # 979-0 is not a registration group
+    assert registration_group(core + _check13(core)) is None
+
+
+def test_every_registrant_group_has_a_name():
+    from hondana._isbn_ranges import GROUP_NAMES, REGISTRANT_RULES
+    assert set(GROUP_NAMES) == set(REGISTRANT_RULES)
+    assert all(name.strip() for name in GROUP_NAMES.values())
+
+
+def test_registration_group_agrees_with_hyphenate():
+    from hondana import hyphenate, registration_group
+    for isbn in ("9784003101018", "9780131103627", "9783161484100", "9791032300824",
+                 "9789571234564", "9798350000009"):
+        hyp = hyphenate(isbn)
+        found = registration_group(isbn)
+        assert found is not None and hyp.startswith(found[0] + "-")

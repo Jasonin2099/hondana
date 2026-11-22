@@ -34,11 +34,15 @@ DEST = ROOT / "src" / "hondana" / "_isbn_ranges.py"
 
 # One rule: (lo, hi, length) where lo/hi are the official 7-digit bounds.
 Rule = Tuple[str, str, int]
-Tables = Tuple[str, str, Dict[str, List[Rule]], Dict[str, List[Rule]]]
+Tables = Tuple[str, str, Dict[str, List[Rule]], Dict[str, List[Rule]], Dict[str, str]]
 
 
 def parse_range_message(xml: str) -> Tables:
-    """Return (message_date, message_serial, group_rules, registrant_rules)."""
+    """Return (message_date, message_serial, group_rules, registrant_rules, group_names).
+
+    ``group_names`` maps a registration group such as ``"978-4"`` to the
+    agency name in the message (``"Japan"``, ``"English language"`` …).
+    """
     root = ET.fromstring(xml)
 
     def text(el: ET.Element | None) -> str:
@@ -78,6 +82,7 @@ def parse_range_message(xml: str) -> Tables:
         raise ValueError("RangeMessage.xml is missing EAN prefixes 978/979")
 
     registrant_rules: Dict[str, List[Rule]] = {}
+    group_names: Dict[str, str] = {}
     groups = root.find("RegistrationGroups")
     if groups is None:
         raise ValueError("RangeMessage.xml is missing RegistrationGroups")
@@ -85,9 +90,12 @@ def parse_range_message(xml: str) -> Tables:
         prefix = text(group.find("Prefix"))
         if prefix:
             registrant_rules[prefix] = rules_of(group)
+            agency = text(group.find("Agency"))
+            if agency:
+                group_names[prefix] = agency
     if not registrant_rules:
         raise ValueError("RangeMessage.xml contains no registration groups")
-    return date, serial, group_rules, registrant_rules
+    return date, serial, group_rules, registrant_rules, group_names
 
 
 def _compact(rules: List[Rule]) -> str:
@@ -95,7 +103,7 @@ def _compact(rules: List[Rule]) -> str:
 
 
 def render_module(tables: Tables) -> str:
-    date, serial, group_rules, registrant_rules = tables
+    date, serial, group_rules, registrant_rules, group_names = tables
     group_src = {k: _compact(v) for k, v in sorted(group_rules.items())}
     reg_src = {k: _compact(v) for k, v in sorted(registrant_rules.items())}
     header = (
@@ -114,7 +122,9 @@ def render_module(tables: Tables) -> str:
         "# EAN.UCC prefix -> compact group-length rules (7-digit lo-hi:length).\n",
         f"GROUP_RULES: dict[str, str] = {pprint.pformat(group_src, width=100, sort_dicts=True)}\n\n",
         "# '978-4' -> compact registrant-length rules (7-digit lo-hi:length).\n",
-        f"REGISTRANT_RULES: dict[str, str] = {pprint.pformat(reg_src, width=100, sort_dicts=True)}\n",
+        f"REGISTRANT_RULES: dict[str, str] = {pprint.pformat(reg_src, width=100, sort_dicts=True)}\n\n",
+        "# '978-4' -> registration-group (agency) name as given in the range message.\n",
+        f"GROUP_NAMES: dict[str, str] = {pprint.pformat(dict(sorted(group_names.items())), width=100)}\n",
     ]
     return "".join(parts)
 
@@ -136,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     text = render_module(tables)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(text, encoding="utf-8")
-    date, serial, _groups, registrant_rules = tables
+    date, serial, _groups, registrant_rules, _names = tables
     print(
         f"wrote {a.out} ({len(text)} bytes, {len(registrant_rules)} groups, "
         f"date={date}, serial={serial or '-'})",

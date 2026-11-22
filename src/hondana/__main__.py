@@ -1,7 +1,8 @@
-"""python -m hondana fold|isbn|lookup|search|dedupe …
+"""python -m hondana fold|isbn|ccode|lookup|search|dedupe …
 
   fold   — print the matching key for some text
   isbn   — find, validate and hyphenate ISBNs in text (no network)
+  ccode  — decode Japanese C-codes into 販売対象 / 発行形態 / 内容 (no network)
   lookup — look ISBNs up across openBD / NDL / Google Books / Open Library
   search — search by title or author (NDL Search, Open Library)
   dedupe — report (or drop) duplicate rows in a book-list CSV
@@ -13,7 +14,8 @@ import json
 import sys
 from typing import List, Optional, Sequence
 
-from .isbn import find_isbns, hyphenate, is_valid, to_isbn13
+from .ccode import decode_ccode
+from .isbn import find_isbns, hyphenate, is_valid, registration_group, to_isbn13
 from .export import dumps
 from .lookup import Book
 from .dedupe import _AUTHOR_ALIASES, _ISBN_ALIASES, _TITLE_ALIASES, dedupe, resolve_field
@@ -62,9 +64,11 @@ def _cmd_isbn(a: argparse.Namespace) -> int:
         valid = is_valid(text)
         isbn13 = to_isbn13(text, strict=True) if valid else ""
         hyp = hyphenate(text) if valid else ""
+        prefix, name = registration_group(text) or ("", "")
         if a.json:
             print(json.dumps(
-                {"isbn": text, "isbn13": isbn13, "hyphenated": hyp, "valid": valid},
+                {"isbn": text, "isbn13": isbn13, "hyphenated": hyp, "valid": valid,
+                 "group": prefix, "group_name": name},
                 ensure_ascii=False,
             ))
         elif a.validate:
@@ -73,11 +77,15 @@ def _cmd_isbn(a: argparse.Namespace) -> int:
             if not valid:
                 print("invalid", file=sys.stderr)
                 return 1
-            print(hyp or isbn13)
+            print(f"{hyp or isbn13}\t{name}" if a.group else (hyp or isbn13))
         return 0 if valid else 1
 
     found = find_isbns(text)
-    rows = [{"isbn13": i, "hyphenated": hyphenate(i) or i, "valid": True} for i in found]
+    rows = []
+    for i in found:
+        prefix, name = registration_group(i) or ("", "")
+        rows.append({"isbn13": i, "hyphenated": hyphenate(i) or i, "valid": True,
+                     "group": prefix, "group_name": name})
     if a.json:
         print(json.dumps(rows, ensure_ascii=False, indent=2))
     elif a.validate:
@@ -88,8 +96,32 @@ def _cmd_isbn(a: argparse.Namespace) -> int:
             print(f"{r['hyphenated']}\tok")
     else:
         for r in rows:
-            print(r["hyphenated"])
+            print(f"{r['hyphenated']}\t{r['group_name']}" if a.group else r["hyphenated"])
     return 0 if rows else 1
+
+
+def _cmd_ccode(a: argparse.Namespace) -> int:
+    codes = list(a.code) or _read_text(()).split()
+    if not codes:
+        print("no C-code given", file=sys.stderr)
+        return 1
+    rows = []
+    bad = 0
+    for raw in codes:
+        info = decode_ccode(raw)
+        if info is None:
+            print(f"invalid C-code: {raw}", file=sys.stderr)
+            bad += 1
+            continue
+        rows.append(info)
+    if a.json:
+        payload = [r._asdict() for r in rows]
+        print(json.dumps(payload[0] if len(codes) == 1 and payload else payload,
+                         ensure_ascii=False, indent=2))
+    else:
+        for r in rows:
+            print("\t".join(("C" + r.code, r.audience, r.form, r.subject, r.detail or "-")))
+    return 1 if bad else 0
 
 
 def _format_table(books: list[Book]) -> str:
@@ -287,7 +319,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     i.add_argument("--find", action="store_true", help="always scan text with find_isbns()")
     i.add_argument("--validate", action="store_true", help="print ok/invalid instead of hyphenating")
     i.add_argument("--hyphenate", action="store_true", help="explicit hyphenate (default for a bare ISBN)")
-    i.add_argument("--json", action="store_true", help="structured JSON output")
+    i.add_argument("--group", action="store_true",
+                   help="also print the registration-group name (Japan, English language, …), tab-separated")
+    i.add_argument("--json", action="store_true", help="structured JSON output (includes group / group_name)")
 
     l = sub.add_parser(
         "lookup",
@@ -302,6 +336,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="output format (default: json for one ISBN, table for many)",
     )
 
+
+    c = sub.add_parser(
+        "ccode",
+        help="decode Japanese C-codes (販売対象 / 発行形態 / 内容), no network",
+    )
+    c.add_argument("code", nargs="*", help="C-codes like C0093 or 3055; reads stdin when omitted")
+    c.add_argument("--json", action="store_true", help="structured JSON output")
 
     d = sub.add_parser(
         "dedupe",
@@ -336,6 +377,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _cmd_fold(a)
     if a.cmd == "isbn":
         return _cmd_isbn(a)
+    if a.cmd == "ccode":
+        return _cmd_ccode(a)
     if a.cmd == "lookup":
         return _cmd_lookup(a)
     if a.cmd == "search":

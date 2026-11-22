@@ -27,6 +27,28 @@ def test_isbn_json(capsys):
     assert d["valid"] and d["hyphenated"] == "978-4-00-310101-8"
 
 
+def test_isbn_json_includes_group(capsys):
+    assert main(["isbn", "--json", "4-00-310101-4"]) == 0
+    d = json.loads(capsys.readouterr().out)
+    assert d["group"] == "978-4" and d["group_name"] == "Japan"
+    assert main(["isbn", "--json", "123"]) == 1
+    d = json.loads(capsys.readouterr().out)
+    assert d["group"] == "" and d["group_name"] == ""
+
+
+def test_isbn_group_flag(capsys):
+    assert main(["isbn", "--group", "9784003101018"]) == 0
+    assert capsys.readouterr().out.strip() == "978-4-00-310101-8\tJapan"
+    assert main(["isbn", "--group", "ISBN 978-4-00-310101-8 / ISBN 0-13-110362-8"]) == 0
+    assert capsys.readouterr().out.strip().splitlines() == [
+        "978-4-00-310101-8\tJapan",
+        "978-0-13-110362-7\tEnglish language",
+    ]
+    # default output stays one hyphenated ISBN per line (safe to pipe into lookup)
+    assert main(["isbn", "ISBN 0-13-110362-8"]) == 0
+    assert capsys.readouterr().out.strip() == "978-0-13-110362-7"
+
+
 def test_fold_still_works(capsys):
     assert main(["fold", "ＡＢＣ"]) == 0
     assert "abc" in capsys.readouterr().out.lower()
