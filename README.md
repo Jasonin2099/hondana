@@ -23,7 +23,7 @@ pip install hondana-ja
 ## 用法
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, ndc_class, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -31,12 +31,13 @@ to_isbn13("4-00-310101-4")                           # '9784003101018'
 hyphenate("9784003101018")                           # '978-4-00-310101-8'（按 ISBN 国际区段表加连字符，含 978-2 / 978-3 / 978-89、979-…；scripts/update_isbn_ranges.py 可更新）
 registration_group("9784003101018")                  # ('978-4', 'Japan')（区段表里的注册组名称，英文）
 decode_ccode("C0093")                                 # CCode(code='0093', audience='一般', form='単行本', subject='文学', detail='日本文学、小説・物語')
+ndc_class("913.6")                                    # NdcClass(code='913.6', main='9', label='文学', label_en='Literature')（只有 0–9 十个大类）
 
 book = lookup("9784003101018")                 # 走网络；查不到返回 None
 book = lookup("9784003101018", merge=True)     # 多源合并，缺字段由后面的源补上
 books = lookup_many(["978…", "978…"], rate=0.5)  # 批量查询，rate=每次间隔秒数
 print(book.title, book.source, book.ccode, book.ndc)  # ccode / ndc 来自 openBD，没有则为空
-print(book.ccode_info, book.cover)  # C 代码解码（to_dict() 里是 ccode_labels）；cover 是 openBD 等返回的封面 URL，不下载图片
+print(book.ccode_info, book.ndc_info, book.cover)  # C 代码解码（to_dict() 里是 ccode_labels）；NDC 大类（to_dict() 里是 ndc_class）；cover 是 openBD 等返回的封面 URL，不下载图片
 hits = search("吾輩は猫である")                  # 不靠 ISBN：NDL Search 与 Open Library，用 fold() 排序
 print(to_bibtex(book))   # 也可 to_ris(book)、to_csl(book)，或 book.to_bibtex()
 ```
@@ -50,6 +51,7 @@ python -m hondana isbn 9784003101018            # 校验并加连字符（不联
 python -m hondana isbn "文中 ISBN 978-4-00-310101-8 …"  # 从文本里找出 ISBN
 python -m hondana isbn --group 9784003101018    # 加连字符并附上注册组名称（Japan 等，Tab 分隔）；--json 里是 group / group_name
 python -m hondana ccode C0093 3055              # 解码 C 代码：販売対象 / 発行形態 / 内容（不联网）
+python -m hondana ndc 913.6 007                 # NDC 分类号所属的大类：0 総記 … 9 文学（不联网）
 python -m hondana lookup 9784003101018          # 联网查询（JSON）
 python -m hondana lookup --merge --format table 978… 978…
 python -m hondana lookup --format bibtex 9784003101018   # 也可 ris / csl
@@ -75,7 +77,7 @@ python -m hondana dedupe books.csv           # 按 ISBN 或折叠后的书名+�
 
 ## ISBN 查询
 
-`lookup()` 每个来源各自 try，一个超时不会连累后面。`merge=True` 会查完 `order` 里的每个源，按字段取第一个非空值并拼接 `source`（如 `openBD+NDL`）。`lookup_many()` 按输入顺序批量查询，`rate` 控制两次之间的最短间隔秒数。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。CiNii Books 是可选来源，默认不查，用 `order=(..., "cinii")` 打开（可设 `HONDANA_CINII_APPID`）。openBD 若带了分类信息，会填入 `Book.ccode`（日本图书 C 代码，不含前导 C）和 `Book.ndc`。`decode_ccode()` / `Book.ccode_info` 把 C 代码解成 販売対象 / 発行形態 / 内容（大分类、中分类）标签，表格依据日本图书代码管理中心《利用の手引き 2025年版》第 24 页的分类记号一览表；表里空白（保留）的中分类，`detail` 为空。C 代码是出版社自选的上架参考，不是图书馆分类。没有 ISBN、只有书名或作者时用 `search()`，默认查国立国会图书馆和 Open Library，结果用 `fold()` 排序。
+`lookup()` 每个来源各自 try，一个超时不会连累后面。`merge=True` 会查完 `order` 里的每个源，按字段取第一个非空值并拼接 `source`（如 `openBD+NDL`）。`lookup_many()` 按输入顺序批量查询，`rate` 控制两次之间的最短间隔秒数。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。CiNii Books 是可选来源，默认不查，用 `order=(..., "cinii")` 打开（可设 `HONDANA_CINII_APPID`）。openBD 若带了分类信息，会填入 `Book.ccode`（日本图书 C 代码，不含前导 C）和 `Book.ndc`。`decode_ccode()` / `Book.ccode_info` 把 C 代码解成 販売対象 / 発行形態 / 内容（大分类、中分类）标签，表格依据日本图书代码管理中心《利用の手引き 2025年版》第 24 页的分类记号一览表；表里空白（保留）的中分类，`detail` 为空。C 代码是出版社自选的上架参考，不是图书馆分类。`ndc_class()` / `Book.ndc_info` 只给出 NDC 分类号第一位对应的十个大类（第1次区分：0 総記、1 哲学、2 歴史、3 社会科学、4 自然科学、5 技術、6 産業、7 芸術、8 言語、9 文学，依据日本图书馆协会公开的说明页），接受 `913.6`、全角数字和 `NDC10:` 之类的前缀；NDC 细目表的著作权属于日本图书馆协会，所以不收录二位以下的类目。没有 ISBN、只有书名或作者时用 `search()`，默认查国立国会图书馆和 Open Library，结果用 `fold()` 排序。
 
 ## 测试
 

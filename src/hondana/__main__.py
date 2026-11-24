@@ -1,8 +1,9 @@
-"""python -m hondana fold|isbn|ccode|lookup|search|dedupe …
+"""python -m hondana fold|isbn|ccode|ndc|lookup|search|dedupe …
 
   fold   — print the matching key for some text
   isbn   — find, validate and hyphenate ISBNs in text (no network)
   ccode  — decode Japanese C-codes into 販売対象 / 発行形態 / 内容 (no network)
+  ndc    — label NDC marks with their main class, 0 総記 … 9 文学 (no network)
   lookup — look ISBNs up across openBD / NDL / Google Books / Open Library
   search — search by title or author (NDL Search, Open Library)
   dedupe — report (or drop) duplicate rows in a book-list CSV
@@ -15,6 +16,7 @@ import sys
 from typing import List, Optional, Sequence
 
 from .ccode import decode_ccode
+from .ndc import ndc_class
 from .isbn import find_isbns, hyphenate, is_valid, registration_group, to_isbn13
 from .export import dumps
 from .lookup import Book
@@ -121,6 +123,30 @@ def _cmd_ccode(a: argparse.Namespace) -> int:
     else:
         for r in rows:
             print("\t".join(("C" + r.code, r.audience, r.form, r.subject, r.detail or "-")))
+    return 1 if bad else 0
+
+
+def _cmd_ndc(a: argparse.Namespace) -> int:
+    marks = list(a.mark) or _read_text(()).split()
+    if not marks:
+        print("no NDC mark given", file=sys.stderr)
+        return 1
+    rows = []
+    bad = 0
+    for raw in marks:
+        info = ndc_class(raw)
+        if info is None:
+            print(f"invalid NDC mark: {raw}", file=sys.stderr)
+            bad += 1
+            continue
+        rows.append(info)
+    if a.json:
+        payload = [r._asdict() for r in rows]
+        print(json.dumps(payload[0] if len(marks) == 1 and payload else payload,
+                         ensure_ascii=False, indent=2))
+    else:
+        for r in rows:
+            print("\t".join((r.code, r.main, r.label, r.label_en)))
     return 1 if bad else 0
 
 
@@ -344,6 +370,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     c.add_argument("code", nargs="*", help="C-codes like C0093 or 3055; reads stdin when omitted")
     c.add_argument("--json", action="store_true", help="structured JSON output")
 
+    n = sub.add_parser(
+        "ndc",
+        help="label NDC marks with their main class (0 総記 … 9 文学), no network",
+    )
+    n.add_argument("mark", nargs="*", help="NDC marks like 913.6 or 007; reads stdin when omitted")
+    n.add_argument("--json", action="store_true", help="structured JSON output")
+
     d = sub.add_parser(
         "dedupe",
         help="report duplicate rows in a book-list CSV (ISBN or folded title + author)",
@@ -379,6 +412,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _cmd_isbn(a)
     if a.cmd == "ccode":
         return _cmd_ccode(a)
+    if a.cmd == "ndc":
+        return _cmd_ndc(a)
     if a.cmd == "lookup":
         return _cmd_lookup(a)
     if a.cmd == "search":

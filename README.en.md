@@ -18,7 +18,7 @@ pip install hondana-ja
 ## Use
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, ndc_class, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -26,17 +26,18 @@ to_isbn13("4-00-310101-4")                           # '9784003101018'
 hyphenate("9784003101018")                           # '978-4-00-310101-8' (from the official ISBN range message, including 978-2/3/89 and 979-…; refresh with scripts/update_isbn_ranges.py)
 registration_group("9784003101018")                  # ('978-4', 'Japan') (group name from the same range message)
 decode_ccode("C0093")                                 # CCode(code='0093', audience='一般', form='単行本', subject='文学', detail='日本文学、小説・物語')
+ndc_class("913.6")                                    # NdcClass(code='913.6', main='9', label='文学', label_en='Literature') (ten main classes only)
 
 book = lookup("9784003101018")                       # hits the network; None if nobody knows it
 book = lookup("9784003101018", merge=True)           # fill missing fields from later sources
 books = lookup_many(["978…", "978…"], rate=0.5)      # batch; rate = min seconds between lookups
 print(book.title, book.source, book.ccode, book.ndc)  # C-code / NDC from openBD, empty if absent
-print(book.ccode_info, book.cover)  # decoded C-code (ccode_labels in to_dict()); cover URL from openBD etc., never downloaded
+print(book.ccode_info, book.ndc_info, book.cover)  # decoded C-code (ccode_labels in to_dict()); NDC main class (ndc_class in to_dict()); cover URL from openBD etc., never downloaded
 hits = search("吾輩は猫である")                  # no ISBN: NDL Search + Open Library, ranked with fold()
 print(to_bibtex(book))   # or to_ris(book), to_csl(book); also book.to_bibtex()
 ```
 
-CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `isbn --group 978…` (adds the registration-group name, tab-separated; `--json` has `group` / `group_name`) · `ccode C0093 3055` (decode Japanese C-codes, no network) · `lookup 978…` · `lookup --merge --format table 978… 978…` · `lookup --format bibtex 978…` (also `ris` / `csl`) · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change) · `search "吾輩は猫である"` (title/author search; also `--title` / `--author`) · `dedupe books.csv` (duplicate groups by ISBN or folded title + author; `--unique clean.csv` writes the first spelling of each)
+CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `isbn --group 978…` (adds the registration-group name, tab-separated; `--json` has `group` / `group_name`) · `ccode C0093 3055` (decode Japanese C-codes, no network) · `ndc 913.6 007` (main class of an NDC mark, 0 総記 … 9 文学, no network) · `lookup 978…` · `lookup --merge --format table 978… 978…` · `lookup --format bibtex 978…` (also `ris` / `csl`) · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change) · `search "吾輩は猫である"` (title/author search; also `--title` / `--author`) · `dedupe books.csv` (duplicate groups by ISBN or folded title + author; `--unique clean.csv` writes the first spelling of each)
 
 ## What `fold()` does
 
@@ -53,7 +54,7 @@ Recipes (cleaning and de-duplicating a book list, searching a catalogue the way 
 
 ## ISBN lookup
 
-Each source is tried independently, so one timeout doesn't skip the rest. `merge=True` queries every source in `order` and fills missing fields (first non-empty wins; `source` becomes e.g. `openBD+NDL`). `lookup_many()` looks up many ISBNs in order; `rate` sets the minimum seconds between lookups. Pass your own `fetch(url, params, timeout) -> (status, text)` to use another HTTP client, add caching, or stub the network in tests. `cached(fetch, ttl=3600)` wraps any fetch with an in-memory TTL cache: `lookup(isbn, fetch=cached())`. When openBD includes classification, `Book.ccode` (Japanese C-code, without a leading C) and `Book.ndc` are filled in. `decode_ccode()` / `Book.ccode_info` turn the C-code into its audience / form / subject / detail labels, following the 分類記号一覧表 in the Japan ISBN Agency's 利用の手引き 2025 edition (p. 24); blank (reserved) cells decode with an empty `detail`. The C-code is the publisher's shelving hint, not a library classification. `search()` looks up a title or author with no ISBN, via NDL Search and Open Library, and ranks hits with `fold()`.
+Each source is tried independently, so one timeout doesn't skip the rest. `merge=True` queries every source in `order` and fills missing fields (first non-empty wins; `source` becomes e.g. `openBD+NDL`). `lookup_many()` looks up many ISBNs in order; `rate` sets the minimum seconds between lookups. Pass your own `fetch(url, params, timeout) -> (status, text)` to use another HTTP client, add caching, or stub the network in tests. `cached(fetch, ttl=3600)` wraps any fetch with an in-memory TTL cache: `lookup(isbn, fetch=cached())`. When openBD includes classification, `Book.ccode` (Japanese C-code, without a leading C) and `Book.ndc` are filled in. `decode_ccode()` / `Book.ccode_info` turn the C-code into its audience / form / subject / detail labels, following the 分類記号一覧表 in the Japan ISBN Agency's 利用の手引き 2025 edition (p. 24); blank (reserved) cells decode with an empty `detail`. The C-code is the publisher's shelving hint, not a library classification. `ndc_class()` / `Book.ndc_info` label an NDC mark with its main class only — the ten first-digit classes (0 総記 General works … 9 文学 Literature, as the Japan Library Association lists them on its public NDC page); it accepts `913.6`, full-width digits and prefixes such as `NDC10:`. The NDC schedules are copyrighted by the Japan Library Association, so nothing below the main classes is bundled. `search()` looks up a title or author with no ISBN, via NDL Search and Open Library, and ranks hits with `fold()`.
 
 ## Tests
 

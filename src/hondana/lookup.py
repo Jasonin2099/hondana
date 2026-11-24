@@ -25,6 +25,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple
 
 from .ccode import CCode, decode_ccode
+from .ndc import NdcClass, ndc_class
 from .isbn import to_isbn13
 from .fold import fold
 
@@ -108,15 +109,25 @@ class Book:
         """``ccode`` decoded into 販売対象 / 発行形態 / 内容 labels, or ``None``."""
         return decode_ccode(self.ccode)
 
+    @property
+    def ndc_info(self) -> Optional[NdcClass]:
+        """``ndc`` with the label of its main class (0 総記 … 9 文学), or ``None``."""
+        return ndc_class(self.ndc)
+
     def to_dict(self) -> Dict[str, Any]:
         """Fields as a dict. When ``ccode`` decodes, ``ccode_labels`` holds the
-        audience / form / subject / detail labels (not part of the dataclass)."""
+        audience / form / subject / detail labels; when ``ndc`` parses,
+        ``ndc_class`` holds its main class and labels (neither is part of the
+        dataclass)."""
         d: Dict[str, Any] = asdict(self)
         if d["raw"] is None:
             del d["raw"]
         info = self.ccode_info
         if info is not None:
             d["ccode_labels"] = {k: v for k, v in info._asdict().items() if k != "code"}
+        ndc = self.ndc_info
+        if ndc is not None:
+            d["ndc_class"] = {"main": ndc.main, "label": ndc.label, "label_en": ndc.label_en}
         return d
 
     def to_bibtex(self) -> str:

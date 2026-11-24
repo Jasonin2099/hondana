@@ -183,6 +183,21 @@ When openBD has classification data, `lookup()` fills `Book.ccode` (the 4-digit
 Japanese C-code, without a leading C) and `Book.ndc`. ONIX subject scheme 79 is
 the bookseller genre code and is not treated as NDC.
 
+`ndc_class()` (or `Book.ndc_info`) labels an NDC mark with its main class only.
+hondana ships just the ten first-digit classes (第1次区分, NDC 新訂10版, as the
+Japan Library Association lists them publicly); the full schedules are
+copyrighted, so divisions and sections are not included.
+
+```python
+from hondana import Book, ndc_class
+
+assert ndc_class("913.6").label == "文学"
+assert ndc_class("NDC10:007.64").label_en == "General works"
+assert ndc_class("K913") is None          # shelf prefixes are not NDC
+book = Book("9784003101018", "吾輩は猫である", ndc="913.6")
+assert book.to_dict()["ndc_class"] == {"main": "9", "label": "文学", "label_en": "Literature"}
+```
+
 ## From the shell
 
 The CLI reads its text from arguments or stdin, so it fits into pipes:

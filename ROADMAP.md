@@ -58,9 +58,11 @@ so we do not grow a citeproc, a full BibTeX parser, or a holdings search.
       内容細目), as a small bundled table. Show the labels in the CLI and on `Book`.
       — `decode_ccode()`, `Book.ccode_info`, `ccode_labels` in `to_dict()`, CLI
       `hondana ccode`; table from the Japan ISBN Agency 利用の手引き 2025 (p. 24).
-- [ ] NDC class *labels* for the 10 main classes only (0 総記 … 9 産業). The full
+- [x] NDC class *labels* for the 10 main classes only (0 総記 … 9 文学). The full
       NDC schedules are copyrighted by the Japan Library Association, so this
-      would not bundle divisions or the complete outline.
+      would not bundle divisions or the complete outline. — `ndc_class()`,
+      `Book.ndc_info`, `ndc_class` in `to_dict()`, CLI `hondana ndc`; labels from
+      the JLA's public NDC page (新訂10版 第1次区分表).
 - [x] Surface the cover URL that openBD already returns (`summary.cover`) as
       `Book.cover`. Do not download the image. — already filled (https) since 0.1;
       now covered by a test and documented.
