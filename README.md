@@ -23,7 +23,7 @@ pip install hondana-ja
 ## 用法
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, ndc_class, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, ndc_class, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl, loads
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -40,6 +40,7 @@ print(book.title, book.source, book.ccode, book.ndc)  # ccode / ndc 来自 openB
 print(book.ccode_info, book.ndc_info, book.cover)  # C 代码解码（to_dict() 里是 ccode_labels）；NDC 大类（to_dict() 里是 ndc_class）；cover 是 openBD 等返回的封面 URL，不下载图片
 hits = search("吾輩は猫である")                  # 不靠 ISBN：NDL Search 与 Open Library，用 fold() 排序
 print(to_bibtex(book))   # 也可 to_ris(book)、to_csl(book)，或 book.to_bibtex()
+books = loads(open("list.bib", encoding="utf-8").read())  # 读回 hondana 自己导出的 BibTeX / RIS / CSL-JSON（自动判断格式；只读上面这几个字段，不是通用解析器）
 ```
 
 命令行：
@@ -58,6 +59,7 @@ python -m hondana lookup --format bibtex 9784003101018   # 也可 ris / csl
 python -m hondana isbn --find < paper.txt | python -m hondana lookup   # 从 stdin 读 ISBN，默认每次间隔 0.5 秒（--rate 可改）
 python -m hondana search "吾輩は猫である"    # 按书名/作者搜（也可用 --title / --author）
 python -m hondana dedupe books.csv           # 按 ISBN 或折叠后的书名+作者报告重复组；--unique clean.csv 写出去重结果
+python -m hondana convert list.ris --to bibtex   # 读回导出的 BibTeX / RIS / CSL-JSON 并换成另一种格式（默认 JSON；--from 可指定输入格式）
 ```
 
 ## `fold()` 做了什么

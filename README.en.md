@@ -18,7 +18,7 @@ pip install hondana-ja
 ## Use
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, ndc_class, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, ndc_class, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl, loads
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -35,9 +35,10 @@ print(book.title, book.source, book.ccode, book.ndc)  # C-code / NDC from openBD
 print(book.ccode_info, book.ndc_info, book.cover)  # decoded C-code (ccode_labels in to_dict()); NDC main class (ndc_class in to_dict()); cover URL from openBD etc., never downloaded
 hits = search("吾輩は猫である")                  # no ISBN: NDL Search + Open Library, ranked with fold()
 print(to_bibtex(book))   # or to_ris(book), to_csl(book); also book.to_bibtex()
+books = loads(open("list.bib", encoding="utf-8").read())  # read back hondana's own BibTeX / RIS / CSL-JSON (format guessed; only the exported fields, not a general parser)
 ```
 
-CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `isbn --group 978…` (adds the registration-group name, tab-separated; `--json` has `group` / `group_name`) · `ccode C0093 3055` (decode Japanese C-codes, no network) · `ndc 913.6 007` (main class of an NDC mark, 0 総記 … 9 文学, no network) · `lookup 978…` · `lookup --merge --format table 978… 978…` · `lookup --format bibtex 978…` (also `ris` / `csl`) · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change) · `search "吾輩は猫である"` (title/author search; also `--title` / `--author`) · `dedupe books.csv` (duplicate groups by ISBN or folded title + author; `--unique clean.csv` writes the first spelling of each)
+CLI: `python -m hondana fold "ＡＢＣ　入門"` · `fold --explain …` · `isbn 978…` (validate/hyphenate, no network) · `isbn "text with ISBN…"` · `isbn --group 978…` (adds the registration-group name, tab-separated; `--json` has `group` / `group_name`) · `ccode C0093 3055` (decode Japanese C-codes, no network) · `ndc 913.6 007` (main class of an NDC mark, 0 総記 … 9 文学, no network) · `lookup 978…` · `lookup --merge --format table 978… 978…` · `lookup --format bibtex 978…` (also `ris` / `csl`) · `isbn --find < paper.txt | lookup` (ISBNs from stdin, 0.5 s between lookups by default, `--rate` to change) · `search "吾輩は猫である"` (title/author search; also `--title` / `--author`) · `dedupe books.csv` (duplicate groups by ISBN or folded title + author; `--unique clean.csv` writes the first spelling of each) · `convert list.ris --to bibtex` (reads back BibTeX / RIS / CSL-JSON that hondana wrote; JSON by default, `--from` to force the input format)
 
 ## What `fold()` does
 

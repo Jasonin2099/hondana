@@ -18,7 +18,7 @@ pip install hondana-ja
 ## 使い方
 
 ```python
-from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, ndc_class, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl
+from hondana import fold, to_isbn13, hyphenate, registration_group, decode_ccode, ndc_class, lookup, lookup_many, search, dedupe, to_bibtex, to_ris, to_csl, loads
 
 fold("圖書館") == fold("图书馆") == fold("図書館")   # True
 fold("ﾊﾘｰ・ﾎﾟｯﾀｰ") == fold("はりー ぽったー")         # True
@@ -35,9 +35,10 @@ print(book.title, book.source, book.ccode, book.ndc)  # ccode / ndc は openBD �
 print(book.ccode_info, book.ndc_info, book.cover)  # C コードの解読（to_dict() では ccode_labels）。NDC の類（to_dict() では ndc_class）。cover は openBD などの書影 URL（画像はダウンロードしない）
 hits = search("吾輩は猫である")                  # ISBN なし：NDL サーチと Open Library。fold() で順位付け
 print(to_bibtex(book))   # to_ris(book)、to_csl(book)、book.to_bibtex() も可
+books = loads(open("list.bib", encoding="utf-8").read())  # hondana が書き出した BibTeX / RIS / CSL-JSON を読み戻す（形式は自動判定。書き出すフィールドだけで、汎用パーサではない）
 ```
 
-CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `isbn --group 978…`（登録グループ名をタブ区切りで併記。`--json` では `group` / `group_name`）／ `ccode C0093 3055`（C コードを販売対象・発行形態・内容に解読、ネット不要）／ `ndc 913.6 007`（NDC 分類記号の類、0 総記〜9 文学、ネット不要）／ `lookup 978…` ／ `lookup --merge --format table 978… 978…` ／ `lookup --format bibtex 978…`（`ris` / `csl` も可）／ `isbn --find < paper.txt | lookup`（標準入力から ISBN を読む。間隔は既定 0.5 秒、`--rate` で変更）／ `search "吾輩は猫である"`（書名・著者検索。`--title` / `--author` も可）／ `dedupe books.csv`（ISBN、または畳んだ書名+著者で重複グループを報告。`--unique clean.csv` で先頭表記を書き出す）
+CLI：`fold "ＡＢＣ　入門"` ／ `fold --explain …` ／ `isbn 978…`（検証・ハイフン付け、ネット不要）／ `isbn "文中の ISBN…"` ／ `isbn --group 978…`（登録グループ名をタブ区切りで併記。`--json` では `group` / `group_name`）／ `ccode C0093 3055`（C コードを販売対象・発行形態・内容に解読、ネット不要）／ `ndc 913.6 007`（NDC 分類記号の類、0 総記〜9 文学、ネット不要）／ `lookup 978…` ／ `lookup --merge --format table 978… 978…` ／ `lookup --format bibtex 978…`（`ris` / `csl` も可）／ `isbn --find < paper.txt | lookup`（標準入力から ISBN を読む。間隔は既定 0.5 秒、`--rate` で変更）／ `search "吾輩は猫である"`（書名・著者検索。`--title` / `--author` も可）／ `dedupe books.csv`（ISBN、または畳んだ書名+著者で重複グループを報告。`--unique clean.csv` で先頭表記を書き出す）／ `convert list.ris --to bibtex`（hondana が書き出した BibTeX / RIS / CSL-JSON を読み戻して別形式に。既定は JSON、`--from` で入力形式を指定）
 
 ## `fold()` の中身
 

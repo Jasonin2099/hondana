@@ -66,10 +66,12 @@ so we do not grow a citeproc, a full BibTeX parser, or a holdings search.
 - [x] Surface the cover URL that openBD already returns (`summary.cover`) as
       `Book.cover`. Do not download the image. — already filled (https) since 0.1;
       now covered by a test and documented.
-- [ ] Import the formats we already export: `from_bibtex` / `from_ris` / `from_csl`
+- [x] Import the formats we already export: `from_bibtex` / `from_ris` / `from_csl`
       (and CLI) for the fields hondana itself writes. Stay zero-dependency; a
       conservative subset, not a general BibTeX implementation (bibtexparser /
-      rispy already exist for the general case).
+      rispy already exist for the general case). — `hondana.reimport`:
+      `loads()` (format guessed) and the three readers; CLI `hondana convert`;
+      `dumps(loads(text))` round-trips our own exports (tested).
 - [ ] Optional Japan Search (ジャパンサーチ) source for `search()` / `lookup()`,
       after checking the API terms. Complements NDL; no holdings / Calil.
 - [x] When hyphenating an ISBN, also print the registration-group name (Japan,

@@ -10,6 +10,8 @@ Python block on this page runs offline as written and is executed by
 - [Fill in missing metadata](#fill-in-missing-metadata)
 - [Search by title or author](#search-by-title-or-author)
 - [From the shell](#from-the-shell)
+- [Export a reference list](#export-a-reference-list)
+- [Read an exported list back in](#read-an-exported-list-back-in)
 
 ## Clean and de-duplicate a book list
 
@@ -254,3 +256,37 @@ assert csl.strip().startswith("[")
 
 From the shell: `python -m hondana lookup --format bibtex 9784003101018`
 (also `--format ris` and `--format csl`).
+
+## Read an exported list back in
+
+`loads()` (and `from_bibtex` / `from_ris` / `from_csl`) read the files the
+exporters above write, so a list can go lookup → `.bib` → hand edits → back
+into `Book` objects, or RIS → BibTeX. It only reads hondana's five fields
+(title, author, publisher, year, ISBN) and a conservative subset of each
+format: no `@string` macros, `#` concatenation or LaTeX accents. For arbitrary
+files use bibtexparser, rispy or citeproc-py.
+
+```python
+from hondana import Book, dumps, loads
+
+books = [
+    Book(isbn="9784003101018", title="吾輩は猫である", author="夏目漱石／著",
+         publisher="岩波書店", year="1990"),
+    Book(isbn="9780140449136", title="Crime and Punishment",
+         author="Dostoyevsky, Fyodor and McDuff, David", publisher="Penguin", year="2003"),
+]
+ris = dumps(books, "ris")
+
+back = loads(ris)                       # format guessed: "ris"
+assert back[0].isbn == "9784003101018"  # hyphenated on export, digits again
+assert back[0].author == "夏目漱石"
+assert back[1].author == "Dostoyevsky, Fyodor; McDuff, David"   # "; " between names
+assert back[1].source == "ris"
+assert dumps(back, "ris") == ris        # same text after a round trip
+
+bib = dumps(back, "bibtex")             # RIS → BibTeX
+assert loads(bib, "bibtex")[0].title == "吾輩は猫である"
+```
+
+From the shell: `python -m hondana convert list.ris --to bibtex` (input format
+is guessed; `--from bibtex|ris|csl` to force it, `--to json|table|bibtex|ris|csl`).

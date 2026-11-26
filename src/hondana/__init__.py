@@ -6,6 +6,7 @@ from .ccode import CCode, decode_ccode
 from .ndc import NdcClass, ndc_class
 from .lookup import Book, cached, lookup, lookup_many, search
 from .dedupe import DuplicateGroup, DedupeResult, dedupe, dedupe_key
+from .reimport import from_bibtex, from_csl, from_ris, loads
 
 __version__ = "0.3.0"
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "NdcClass", "ndc_class",
     "dedupe", "dedupe_key", "DuplicateGroup", "DedupeResult",
     "to_bibtex", "to_ris", "to_csl", "dumps",
+    "from_bibtex", "from_ris", "from_csl", "loads",
 ]

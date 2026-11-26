@@ -1,4 +1,4 @@
-"""python -m hondana fold|isbn|ccode|ndc|lookup|search|dedupe …
+"""python -m hondana fold|isbn|ccode|ndc|lookup|search|dedupe|convert …
 
   fold   — print the matching key for some text
   isbn   — find, validate and hyphenate ISBNs in text (no network)
@@ -7,6 +7,7 @@
   lookup — look ISBNs up across openBD / NDL / Google Books / Open Library
   search — search by title or author (NDL Search, Open Library)
   dedupe — report (or drop) duplicate rows in a book-list CSV
+  convert — read back BibTeX / RIS / CSL-JSON that hondana wrote (no network)
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from .ccode import decode_ccode
 from .ndc import ndc_class
 from .isbn import find_isbns, hyphenate, is_valid, registration_group, to_isbn13
 from .export import dumps
+from .reimport import loads
 from .lookup import Book
 from .dedupe import _AUTHOR_ALIASES, _ISBN_ALIASES, _TITLE_ALIASES, dedupe, resolve_field
 from . import fold, fold_steps, lookup_many, search
@@ -323,6 +325,30 @@ def _cmd_dedupe(a: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_convert(a: argparse.Namespace) -> int:
+    if a.file and a.file != "-":
+        with open(a.file, encoding="utf-8-sig") as fh:
+            text = fh.read()
+    else:
+        text = sys.stdin.read()
+    try:
+        books = loads(text, None if a.input == "auto" else a.input)
+    except (ValueError, json.JSONDecodeError) as e:
+        print(f"cannot read input: {e}", file=sys.stderr)
+        return 1
+    if not books:
+        print("no records found", file=sys.stderr)
+        return 1
+    fmt = a.to
+    if fmt == "json":
+        print(json.dumps([b.to_dict() for b in books], ensure_ascii=False, indent=2))
+    elif fmt == "table":
+        print(_format_table(books))
+    else:
+        sys.stdout.write(dumps(books if len(books) > 1 else books[0], fmt))
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(prog="hondana")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -405,6 +431,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="output format (default: json for one hit, table for many)",
     )
 
+    v = sub.add_parser(
+        "convert",
+        help="read BibTeX / RIS / CSL-JSON that hondana wrote and print it in another format",
+    )
+    v.add_argument("file", nargs="?", help="input file; reads stdin when omitted or given as -")
+    v.add_argument("--from", dest="input", choices=("auto", "bibtex", "ris", "csl"), default="auto",
+                   help="input format (default: guess from the content)")
+    v.add_argument("--to", choices=("json", "table", "bibtex", "ris", "csl"), default="json",
+                   help="output format (default: json, one Book per record)")
+
     a = p.parse_args(argv)
     if a.cmd == "fold":
         return _cmd_fold(a)
@@ -420,6 +456,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _cmd_search(a)
     if a.cmd == "dedupe":
         return _cmd_dedupe(a)
+    if a.cmd == "convert":
+        return _cmd_convert(a)
     return 2
 
 
