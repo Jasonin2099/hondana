@@ -62,6 +62,14 @@ def test_to_bibtex_escapes_latex_specials():
     assert " & " not in text and " 100%" not in text
 
 
+def test_to_bibtex_escapes_backslash_tilde_caret_once():
+    # The braces inside \textbackslash{} must not be escaped a second time
+    # (that rendered as "\{}" in LaTeX).
+    text = to_bibtex(Book(isbn="", title="a\\b ~ ^"))
+    assert r"a\textbackslash{}b \textasciitilde{} \textasciicircum{}" in text
+    assert r"\{\}" not in text
+
+
 def test_to_bibtex_omits_empty_fields():
     text = to_bibtex(Book(isbn="9784003101018", title="Only Title"))
     assert "title = {Only Title}" in text

@@ -33,7 +33,7 @@ _AUTHOR_SPLIT = re.compile(r"\s*(?:、|，|;|／|/|\band\b)\s*")
 _WESTERN_NAME = re.compile(r"^([^,]+),\s+(.+)$")
 _YEAR = re.compile(r"(\d{4})")
 
-# LaTeX specials. Backslash first so we don't double-escape the escapes.
+# LaTeX specials, replaced in a single pass by _bibtex_escape().
 _BIBTEX_SPECIALS = (
     ("\\", r"\textbackslash{}"),
     ("{", r"\{"),
@@ -89,10 +89,13 @@ def _csl_name(name: str) -> Dict[str, str]:
     return {"literal": name}
 
 
+_BIBTEX_ESCAPES = dict(_BIBTEX_SPECIALS)
+_BIBTEX_SPECIAL_RE = re.compile("[" + re.escape("".join(_BIBTEX_ESCAPES)) + "]")
+
+
 def _bibtex_escape(value: str) -> str:
-    for src, dst in _BIBTEX_SPECIALS:
-        value = value.replace(src, dst)
-    return value
+    # One pass, so the braces in ``\textbackslash{}`` are not escaped again.
+    return _BIBTEX_SPECIAL_RE.sub(lambda m: _BIBTEX_ESCAPES[m.group(0)], value)
 
 
 def _bibtex_field(name: str, value: str) -> str:
