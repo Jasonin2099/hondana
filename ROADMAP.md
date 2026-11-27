@@ -74,6 +74,18 @@ so we do not grow a citeproc, a full BibTeX parser, or a holdings search.
       `dumps(loads(text))` round-trips our own exports (tested).
 - [ ] Optional Japan Search (ジャパンサーチ) source for `search()` / `lookup()`,
       after checking the API terms. Complements NDL; no holdings / Calil.
+      Terms checked 2026-11-26; user chose full integration, per database.
+      - [x] Client + per-database terms (`hondana.jpsearch`): `apiType` ng and
+            no-reuse terms always skipped, `restricted` only on request minus
+            `guionly` fields, licences classified (CC0 / CC BY / … / custom),
+            `Policy(accept, allow, deny, restricted)`, credit line per record
+            in the site-policy format; docs/japan-search.md.
+      - [ ] Wire into `search(sources=(..., "jpsearch"))`, keeping licence and
+            attribution on the result (Book has no field for them yet).
+      - [ ] CLI (`hondana search --source jpsearch`, credit lines in output).
+      - [ ] `lookup()`: keyword search on an ISBN is fuzzy, so only if an exact
+            route exists (check the SPARQL endpoint first); otherwise document
+            that ISBN lookup stays with openBD / NDL.
 - [x] When hyphenating an ISBN, also print the registration-group name (Japan,
       English-language, …). The official RangeMessage table we already ship
       has the group data. — `registration_group()`, `hondana isbn --group`,

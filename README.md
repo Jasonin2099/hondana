@@ -81,6 +81,8 @@ python -m hondana convert list.ris --to bibtex   # 读回导出的 BibTeX / RIS 
 
 `lookup()` 每个来源各自 try，一个超时不会连累后面。`merge=True` 会查完 `order` 里的每个源，按字段取第一个非空值并拼接 `source`（如 `openBD+NDL`）。`lookup_many()` 按输入顺序批量查询，`rate` 控制两次之间的最短间隔秒数。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。CiNii Books 是可选来源，默认不查，用 `order=(..., "cinii")` 打开（可设 `HONDANA_CINII_APPID`）。openBD 若带了分类信息，会填入 `Book.ccode`（日本图书 C 代码，不含前导 C）和 `Book.ndc`。`decode_ccode()` / `Book.ccode_info` 把 C 代码解成 販売対象 / 発行形態 / 内容（大分类、中分类）标签，表格依据日本图书代码管理中心《利用の手引き 2025年版》第 24 页的分类记号一览表；表里空白（保留）的中分类，`detail` 为空。C 代码是出版社自选的上架参考，不是图书馆分类。`ndc_class()` / `Book.ndc_info` 只给出 NDC 分类号第一位对应的十个大类（第1次区分：0 総記、1 哲学、2 歴史、3 社会科学、4 自然科学、5 技術、6 産業、7 芸術、8 言語、9 文学，依据日本图书馆协会公开的说明页），接受 `913.6`、全角数字和 `NDC10:` 之类的前缀；NDC 细目表的著作权属于日本图书馆协会，所以不收录二位以下的类目。没有 ISBN、只有书名或作者时用 `search()`，默认查国立国会图书馆和 Open Library，结果用 `fold()` 排序。
 
+ジャパンサーチ（开发中）：`hondana.jpsearch.JapanSearch` 检索日本国家级元数据平台，并先按每个数据库自己的条款过滤——禁止 API 使用或禁止二次利用的数据库一律跳过；“一部項目利用不可”的数据库只在明确开启时使用，并去掉受限字段；其他许可或自定条款需要你看过后手动放行；每条记录都带许可类型和出处署名（出典）文字。尚未接入 `search()`，说明见 [docs/japan-search.md](docs/japan-search.md)（英文）。
+
 ## 测试
 
 ```bash
