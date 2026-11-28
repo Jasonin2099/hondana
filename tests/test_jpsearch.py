@@ -225,6 +225,18 @@ def test_ndl_record_fields_and_attribution():
     assert (b.isbn, b.title, b.source) == ("9784003101018", "吾輩は猫である", "Japan Search")
 
 
+def test_ndl_record_with_printed_isbn_field():
+    # dignl-style items carry "…ISBN-s": "4-634-34250-2" instead of the -u URI
+    it = item("natbib", 2, "海の道と東西の出会い", ["青木康征 著"], ["1998"], extra={"natbib-rdf:RDF": {
+        "dcndl:BibResource": {"dcterms:identifier_rdf:datatype_http://ndl_go_jp/dcndl/terms/ISBN-s": "4-634-34250-2"}}})
+    routes = {
+        "/database/search": (200, json.dumps(DATABASES)),
+        "/organization/search": (200, json.dumps(ORGS)),
+        "/item/search/jps-cross": (200, json.dumps({"list": [it]})),
+    }
+    assert JapanSearch(fake(routes=routes)).search("海")[0].isbn == "9784634342507"
+
+
 def test_generic_record_uses_common_fields_and_item_link():
     r = JapanSearch(fake()).search("猫")[1]
     assert (r.title, r.author, r.publisher, r.year, r.isbn) == ("猫の本", "猫山 著", "", "1935", "")

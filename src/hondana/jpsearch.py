@@ -312,7 +312,9 @@ def _agents(v: Any) -> List[str]:
     return out
 
 
-_ISBN_KEY = "dcterms:identifier_rdf:datatype_http://ndl_go_jp/dcndl/terms/ISBN-u"
+# DC-NDL ISBN: "…ISBN-u" holds an iss.ndl.go.jp URI (bibnl search hits),
+# "…ISBN-s" the printed form "4-634-34250-2" (dignl items).
+_ISBN_KEYS = tuple("dcterms:identifier_rdf:datatype_http://ndl_go_jp/dcndl/terms/ISBN-" + t for t in "us")
 
 
 def _dcndl(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -339,7 +341,7 @@ def _record(item: Dict[str, Any], db: Database, blocked: FrozenSet[str]) -> Opti
         publishers = _agents(res.get("dcterms:publisher"))
         if "contributor" not in blocked and (creators or publishers):
             author, publisher = "、".join(creators), "、".join(publishers)
-        for raw in _strs(res.get(_ISBN_KEY)):
+        for raw in [v for k in _ISBN_KEYS for v in _strs(res.get(k))]:
             isbn = to_isbn13(raw.rsplit("/", 1)[-1], strict=True) or ""
             if isbn:
                 break
