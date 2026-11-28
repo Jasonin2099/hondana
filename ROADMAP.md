@@ -94,6 +94,10 @@ so we do not grow a citeproc, a full BibTeX parser, or a holdings search.
             `schema:identifier` "ISBN:…" (10/13 digits, with/without hyphens)
             via SPARQL; `JapanSearch.lookup()`, `isbn_literals()`,
             `lookup(order=(..., "jpsearch"))`, `hondana lookup --source`.
+- [x] Exports carry the Japan Search licence and 出典 credit line (BibTeX
+      `copyright` / `note`, RIS `N1`, CSL `license` / `note`); `loads()`
+      round-trips them; records without a credit export as before. The CLI
+      no longer reprints credits on stderr for these formats.
 - [x] When hyphenating an ISBN, also print the registration-group name (Japan,
       English-language, …). The official RangeMessage table we already ship
       has the group data. — `registration_group()`, `hondana isbn --group`,

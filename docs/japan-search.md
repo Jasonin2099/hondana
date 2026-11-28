@@ -144,8 +144,18 @@ assert b.attribution == "出典：ジャパンサーチ「ゼロ文庫（ゼロ�
 assert len(books) == 1 and skipped == {"nc": "licence cc-by-nc not in Policy.accept"}
 ```
 
-Exports (`to_bibtex` / `to_ris` / `to_csl`) do not carry the credit line yet;
-keep `book.attribution` next to anything you publish.
+Exports put the metadata licence and the 出典 credit line into each record
+(these describe the *metadata*, not the book's own copyright):
+
+| Format | Licence | Credit line (出典) |
+|---|---|---|
+| BibTeX | `copyright` | `note` |
+| RIS | an `N1` line `Licence: cc-by` (also accepts `License:`) | `N1` |
+| CSL-JSON | `license` | `note` |
+
+Records without either field export exactly as before. `loads()` reads the
+fields back, and `dumps(loads(text))` is unchanged. Keep `book.attribution`
+next to anything you publish in another form.
 
 ## From `lookup()`
 
@@ -182,8 +192,8 @@ python -m hondana lookup 9784003101018 --source openbd --source ndl --source jps
 
 The table is followed by a 出典 / Sources block (one line per credit; NDL
 data needs only one per database). `--format json` keeps `licence` and
-`attribution` on every object; with `bibtex` / `ris` / `csl` the credit lines
-go to stderr as `# title: 出典：…`. Skipped databases are reported on
+`attribution` on every object; `bibtex` / `ris` / `csl` write them into the
+record itself (see the table above). Skipped databases are reported on
 stderr (`# jpsearch: skipped database … (reason)`). `--jp-deny DB` leaves a
 database out.
 

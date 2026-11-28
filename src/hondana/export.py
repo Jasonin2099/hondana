@@ -16,7 +16,7 @@ from typing import Any, Dict, Iterable, List, Sequence, Union
 from .isbn import hyphenate
 from .lookup import Book
 
-__all__ = ["to_bibtex", "to_ris", "to_csl", "dumps", "FORMATS"]
+__all__ = ["to_bibtex", "to_ris", "to_csl", "dumps", "FORMATS", "RIS_LICENCE_PREFIX"]
 
 FORMATS = ("bibtex", "ris", "csl")
 
@@ -102,6 +102,19 @@ def _bibtex_field(name: str, value: str) -> str:
     return f"  {name} = {{{_bibtex_escape(value)}}}"
 
 
+# Japan Search metadata rights, when present:
+#   licence      → BibTeX ``copyright``, RIS ``N1  - Licence: …``, CSL ``license``
+#   attribution  → BibTeX ``note``,        RIS ``N1``,                CSL ``note``
+# These describe the *metadata*, not the book's own copyright. Records
+# with neither field export exactly as they did before this mapping.
+# ``Licence:`` is the RIS convention ``loads()`` recognises (also ``License:``).
+RIS_LICENCE_PREFIX = "Licence: "
+
+
+def _credits(book: Book) -> tuple[str, str]:
+    return (book.licence or "").strip(), (book.attribution or "").strip()
+
+
 def to_bibtex(book: Book) -> str:
     """Render one book as a UTF-8 BibTeX ``@book`` entry."""
     fields = [_bibtex_field("title", book.title)] if book.title else []
@@ -116,6 +129,11 @@ def to_bibtex(book: Book) -> str:
     isbn = _isbn(book)
     if isbn:
         fields.append(_bibtex_field("isbn", isbn))
+    licence, attribution = _credits(book)
+    if licence:
+        fields.append(_bibtex_field("copyright", licence))
+    if attribution:
+        fields.append(_bibtex_field("note", attribution))
     body = ",\n".join(fields)
     return f"@book{{{citation_key(book)},\n{body}\n}}\n"
 
@@ -135,6 +153,12 @@ def to_ris(book: Book) -> str:
     isbn = _isbn(book)
     if isbn:
         lines.append(f"SN  - {isbn}")
+    licence, attribution = _credits(book)
+    if attribution:
+        for line in attribution.split("\n"):
+            lines.append(f"N1  - {line}")
+    if licence:
+        lines.append(f"N1  - {RIS_LICENCE_PREFIX}{licence}")
     lines.append("ER  - ")
     return "\n".join(lines) + "\n"
 
@@ -155,6 +179,11 @@ def to_csl(book: Book) -> Dict[str, Any]:
     isbn = _isbn(book)
     if isbn:
         item["ISBN"] = isbn
+    licence, attribution = _credits(book)
+    if licence:
+        item["license"] = licence
+    if attribution:
+        item["note"] = attribution
     return item
 
 

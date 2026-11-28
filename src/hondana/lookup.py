@@ -629,8 +629,9 @@ def search(
     ``sources=("ndl", "openlibrary", "jpsearch")``. Each database's terms
     are applied first (see :mod:`hondana.jpsearch`; ``jpsearch_policy`` is a
     :class:`hondana.jpsearch.Policy`, default ``Policy()``), and its books
-    carry ``licence`` and ``attribution`` — show the credit line wherever
-    you show the record. ``on_skip(database_id, reason)`` reports the Japan
+    carry ``licence`` and ``attribution`` — the exporters write both into
+    the record (see :mod:`hondana.export`); show the credit line wherever
+    you show the record in another form. ``on_skip(database_id, reason)`` reports the Japan
     Search databases left out. A book found by an earlier source (same
     ISBN or same folded title + author) is kept from that source.
     """

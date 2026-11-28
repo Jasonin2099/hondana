@@ -166,3 +166,55 @@ def test_cli_lookup_format_csl_many_is_array(monkeypatch, capsys):
         "isbn9784003101018",
         "isbn9780140449136",
     ]
+
+
+CREDIT = Book(
+    isbn="9784634342507",
+    title="海の道と東西の出会い",
+    author="青木康征／著",
+    publisher="",
+    year="1998",
+    source="Japan Search",
+    licence="cc-by",
+    attribution="出典：ジャパンサーチ「全国書誌（国立国会図書館）」のメタデータ（https://jpsearch.go.jp/database/natbib）",
+)
+
+
+def test_to_bibtex_writes_copyright_and_note():
+    text = to_bibtex(CREDIT)
+    assert "copyright = {cc-by}" in text
+    assert "note = {出典：ジャパンサーチ「全国書誌（国立国会図書館）」のメタデータ（https://jpsearch.go.jp/database/natbib）}" in text
+    # A book without either field is unchanged: no copyright / note keys.
+    bare = to_bibtex(NEKO)
+    assert "copyright" not in bare and "note" not in bare
+
+
+def test_to_ris_writes_n1_credit_and_licence_line():
+    text = to_ris(CREDIT)
+    assert "N1  - 出典：ジャパンサーチ「全国書誌（国立国会図書館）」のメタデータ（https://jpsearch.go.jp/database/natbib）" in text
+    assert "N1  - Licence: cc-by" in text
+    assert text.endswith("ER  - \n")
+    # Existing books still end at SN / ER with no N1.
+    assert "N1" not in to_ris(NEKO)
+
+
+def test_to_csl_writes_license_and_note():
+    item = to_csl(CREDIT)
+    assert item["license"] == "cc-by"
+    assert item["note"].startswith("出典：ジャパンサーチ")
+    assert "license" not in to_csl(NEKO) and "note" not in to_csl(NEKO)
+
+
+def test_credits_only_licence_or_only_attribution():
+    lic = Book(isbn="9784003101018", title="X", licence="cc0")
+    assert "copyright = {cc0}" in to_bibtex(lic)
+    assert "note" not in to_bibtex(lic)
+    assert "N1  - Licence: cc0" in to_ris(lic)
+    assert to_csl(lic)["license"] == "cc0" and "note" not in to_csl(lic)
+
+    cred = Book(isbn="9784003101018", title="X", attribution="出典：Y")
+    assert "note = {出典：Y}" in to_bibtex(cred)
+    assert "copyright" not in to_bibtex(cred)
+    assert "N1  - 出典：Y" in to_ris(cred)
+    assert "Licence:" not in to_ris(cred)
+    assert to_csl(cred)["note"] == "出典：Y" and "license" not in to_csl(cred)

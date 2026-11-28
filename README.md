@@ -40,7 +40,7 @@ print(book.title, book.source, book.ccode, book.ndc)  # ccode / ndc 来自 openB
 print(book.ccode_info, book.ndc_info, book.cover)  # C 代码解码（to_dict() 里是 ccode_labels）；NDC 大类（to_dict() 里是 ndc_class）；cover 是 openBD 等返回的封面 URL，不下载图片
 hits = search("吾輩は猫である")                  # 不靠 ISBN：NDL Search 与 Open Library，用 fold() 排序
 print(to_bibtex(book))   # 也可 to_ris(book)、to_csl(book)，或 book.to_bibtex()
-books = loads(open("list.bib", encoding="utf-8").read())  # 读回 hondana 自己导出的 BibTeX / RIS / CSL-JSON（自动判断格式；只读上面这几个字段，不是通用解析器）
+books = loads(open("list.bib", encoding="utf-8").read())  # 读回 hondana 自己导出的 BibTeX / RIS / CSL-JSON（自动判断格式；含许可和出典（若有），不是通用解析器）
 ```
 
 命令行：
@@ -83,7 +83,7 @@ python -m hondana convert list.ris --to bibtex   # 读回导出的 BibTeX / RIS 
 
 `lookup()` 每个来源各自 try，一个超时不会连累后面。`merge=True` 会查完 `order` 里的每个源，按字段取第一个非空值并拼接 `source`（如 `openBD+NDL`）。`lookup_many()` 按输入顺序批量查询，`rate` 控制两次之间的最短间隔秒数。想换 HTTP 库、加缓存或写测试，传一个自己的 `fetch(url, params, timeout) -> (status, text)` 进去就行。要简单的内存缓存可以用 `lookup(isbn, fetch=cached(ttl=3600))`。CiNii Books 是可选来源，默认不查，用 `order=(..., "cinii")` 打开（可设 `HONDANA_CINII_APPID`）。openBD 若带了分类信息，会填入 `Book.ccode`（日本图书 C 代码，不含前导 C）和 `Book.ndc`。`decode_ccode()` / `Book.ccode_info` 把 C 代码解成 販売対象 / 発行形態 / 内容（大分类、中分类）标签，表格依据日本图书代码管理中心《利用の手引き 2025年版》第 24 页的分类记号一览表；表里空白（保留）的中分类，`detail` 为空。C 代码是出版社自选的上架参考，不是图书馆分类。`ndc_class()` / `Book.ndc_info` 只给出 NDC 分类号第一位对应的十个大类（第1次区分：0 総記、1 哲学、2 歴史、3 社会科学、4 自然科学、5 技術、6 産業、7 芸術、8 言語、9 文学，依据日本图书馆协会公开的说明页），接受 `913.6`、全角数字和 `NDC10:` 之类的前缀；NDC 细目表的著作权属于日本图书馆协会，所以不收录二位以下的类目。没有 ISBN、只有书名或作者时用 `search()`，默认查国立国会图书馆和 Open Library，结果用 `fold()` 排序。
 
-ジャパンサーチ：`hondana.jpsearch.JapanSearch` 检索日本国家级元数据平台，并先按每个数据库自己的条款过滤——禁止 API 使用或禁止二次利用的数据库一律跳过；“一部項目利用不可”的数据库只在明确开启时使用，并去掉受限字段；其他许可或自定条款需要你看过后手动放行；每条记录都带许可类型和出处署名（出典）文字。可作为 `search(sources=(…, "jpsearch"))` 和 `lookup(isbn, order=(…, "jpsearch"))`（经 SPARQL 端点按 ISBN 精确匹配）的可选来源（默认不启用），返回的 `Book` 保留 `licence` 和 `attribution`（出典署名）。说明见 [docs/japan-search.md](docs/japan-search.md)（英文）。
+ジャパンサーチ：`hondana.jpsearch.JapanSearch` 检索日本国家级元数据平台，并先按每个数据库自己的条款过滤——禁止 API 使用或禁止二次利用的数据库一律跳过；“一部項目利用不可”的数据库只在明确开启时使用，并去掉受限字段；其他许可或自定条款需要你看过后手动放行；每条记录都带许可类型和出处署名（出典）文字。可作为 `search(sources=(…, "jpsearch"))` 和 `lookup(isbn, order=(…, "jpsearch"))`（经 SPARQL 端点按 ISBN 精确匹配）的可选来源（默认不启用），返回的 `Book` 保留 `licence` 和 `attribution`（出典署名）。导出成 BibTeX / RIS / CSL-JSON 时，许可和出典会写入记录本身（BibTeX 的 `copyright` / `note`，RIS 的 `N1`，CSL 的 `license` / `note`）；没有出典的记录导出结果与以前完全相同。说明见 [docs/japan-search.md](docs/japan-search.md)（英文）。
 
 ## 测试
 

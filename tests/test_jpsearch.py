@@ -423,7 +423,9 @@ def test_cli_search_jpsearch_policy_flags_and_exports(monkeypatch, capsys):
     assert pol.restricted and pol.allow == {"own"} and pol.deny == {"zero"} and "cc-by-nc-sa" in pol.accept
     out, err = capsys.readouterr()
     assert "TI  - 非営利の猫" in out and "猫の本" not in out
-    assert "# 非営利の猫: 出典：ジャパンサーチ" in err  # credit line kept on stderr
+    assert "N1  - 出典：ジャパンサーチ" in out  # credit line lives in the RIS record
+    assert "N1  - Licence:" in out
+    assert "# 非営利の猫:" not in err  # no longer reprinted on stderr
     rc = cli.main(["search", "猫", "--source", "jpsearch", "--format", "json"])
     data = json.loads(capsys.readouterr().out)
     assert rc == 0 and all(d["source"] == "Japan Search" and d["attribution"] for d in data)
@@ -573,7 +575,9 @@ def test_cli_lookup_source_jpsearch(monkeypatch, capsys):
     assert "# jpsearch: skipped database closed" in err
     assert cli.main(["lookup", "4634342502", "--source", "jpsearch", "--jp-allow", "own", "--format", "bibtex"]) == 0
     out, err = capsys.readouterr()
-    assert "# 独自規約の海: 出典：ジャパンサーチ「ownデータベース」" in err  # first allowed hit
+    assert "note = {出典：ジャパンサーチ「ownデータベース」" in out  # first allowed hit; credit in the entry
+    assert "copyright =" in out
+    assert "# 独自規約の海:" not in err
     assert seen["jpsearch_policy"].allow == {"own"}
 
 

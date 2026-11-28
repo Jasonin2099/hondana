@@ -189,16 +189,13 @@ def _print_skip(db: str, reason: str) -> None:
 def _print_credits(books: "list[Book]", fmt: str) -> None:
     """Credit lines of sources that ask for one (Japan Search).
 
-    JSON already carries ``attribution``; under a table they are a 出典 block
-    (one line per credit); the export formats have no place for them, so
-    they go to stderr.
+    JSON already carries ``attribution``; BibTeX / RIS / CSL write the
+    licence and credit line into the record itself (see
+    :mod:`hondana.export`); under a table they are a 出典 block
+    (one line per credit).
     """
     credits = [b for b in books if b.attribution]
-    if not credits or fmt == "json":
-        return
-    if fmt in ("bibtex", "ris", "csl"):
-        for b in credits:
-            print(f"# {b.title}: {b.attribution}", file=sys.stderr)
+    if not credits or fmt in ("json", "bibtex", "ris", "csl"):
         return
     print()
     print("出典 / Sources:")

@@ -67,7 +67,7 @@ def test_bibtex_subset():
   author = {Natsume, Soseki and   Mori, Ogai},
   year = 1990,
   ISBN = {4-00-310101-4},
-  note = {not read, {braces} ok},
+  note = {出典：example, {braces} ok},
 }
 @article(key2, title = {Paren entry}, date = {2001-04-01})
 """
@@ -76,6 +76,7 @@ def test_bibtex_subset():
     assert a.author == "Natsume, Soseki; Mori, Ogai"
     assert a.year == "1990"
     assert a.isbn == "9784003101018"  # ISBN-10 → 13 digits
+    assert a.attribution == "出典：example, braces ok"  # note is the credit line
     assert b.title == "Paren entry" and b.year == "2001"
 
 
@@ -85,12 +86,14 @@ def test_bibtex_unterminated_raises():
 
 
 def test_ris_subset():
-    text = "\ufeffTY  - BOOK\r\nT1  - 坊っちゃん\r\nA1  - 夏目漱石\r\nY1  - 1989/05/16/\r\nSN  - 9784101010038 4101010030\r\nN1  - ignored\r\nER  - \r\n"
+    text = "\ufeffTY  - BOOK\r\nT1  - 坊っちゃん\r\nA1  - 夏目漱石\r\nY1  - 1989/05/16/\r\nSN  - 9784101010038 4101010030\r\nN1  - 出典：例\r\nN1  - License: cc0\r\nER  - \r\n"
     (b,) = from_ris(text)
     assert b.title == "坊っちゃん"
     assert b.author == "夏目漱石"
     assert b.year == "1989"
     assert b.isbn == "9784101010038"
+    assert b.attribution == "出典：例"
+    assert b.licence == "cc0"  # American "License:" is accepted
     # Lines outside a record and a record without ER are ignored.
     assert from_ris("TI  - stray\nTY  - BOOK\nTI  - unfinished\n") == []
 
@@ -146,3 +149,43 @@ def test_cli_convert_errors(monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin", io.StringIO("[]"))
     assert main(["convert"]) == 1
     assert "no records" in capsys.readouterr().err
+
+
+CREDIT = Book(
+    isbn="9784634342507",
+    title="海の道と東西の出会い",
+    author="青木康征／著",
+    year="1998",
+    source="Japan Search",
+    licence="cc-by",
+    attribution="出典：ジャパンサーチ「全国書誌（国立国会図書館）」のメタデータ（https://jpsearch.go.jp/database/natbib）",
+)
+
+
+@pytest.mark.parametrize("fmt", ["bibtex", "ris", "csl"])
+def test_round_trip_keeps_licence_and_attribution(fmt):
+    text = dumps(CREDIT, fmt)
+    back = loads(text)
+    assert len(back) == 1
+    assert back[0].licence == "cc-by"
+    assert back[0].attribution == CREDIT.attribution
+    assert dumps(back, fmt) == text
+
+
+@pytest.mark.parametrize("fmt", ["bibtex", "ris", "csl"])
+def test_round_trip_mixed_with_and_without_credits(fmt):
+    text = dumps([NEKO, CREDIT, WESTERN], fmt)
+    back = loads(text)
+    assert [b.licence for b in back] == ["", "cc-by", ""]
+    assert [b.attribution for b in back] == ["", CREDIT.attribution, ""]
+    assert dumps(back, fmt) == text
+
+
+def test_cli_convert_preserves_credits(tmp_path, capsys):
+    src = tmp_path / "list.bib"
+    src.write_text(dumps(CREDIT, "bibtex"), encoding="utf-8")
+    assert main(["convert", str(src), "--to", "ris"]) == 0
+    out = capsys.readouterr().out
+    assert out == dumps(loads(src.read_text(encoding="utf-8")), "ris")
+    assert "N1  - 出典：ジャパンサーチ" in out
+    assert "N1  - Licence: cc-by" in out

@@ -1,7 +1,8 @@
 """Read back the BibTeX, RIS and CSL-JSON that :mod:`hondana.export` writes.
 
-This is deliberately *not* a general parser. It reads the five fields hondana
-exports — title, author, publisher, year, ISBN — from files hondana (or a
+This is deliberately *not* a general parser. It reads the fields hondana
+exports — title, author, publisher, year, ISBN, and when present the metadata
+licence and 出典 credit line — from files hondana (or a
 reference manager writing the same simple shapes) produced, so a reading list
 can go ``lookup → .bib → edit → back into Book``. For arbitrary BibTeX
 (``@string`` macros, ``#`` concatenation, crossref, LaTeX accents) use
@@ -13,12 +14,16 @@ What is understood:
 * BibTeX: any ``@type{key, …}`` entry (``@comment`` / ``@string`` /
   ``@preamble`` are skipped), values in ``{…}`` (nested braces ok), ``"…"`` or
   bare numbers; ``author`` split on ``and``; the escapes ``to_bibtex`` writes
-  are undone and remaining case-protecting braces dropped.
+  are undone and remaining case-protecting braces dropped; ``copyright`` is
+  the metadata licence, ``note`` the credit line.
 * RIS: ``TY`` … ``ER`` records; ``TI``/``T1``, ``AU``/``A1``, ``PB``,
-  ``PY``/``Y1``/``DA`` (year taken from the first four digits), ``SN``.
+  ``PY``/``Y1``/``DA`` (year taken from the first four digits), ``SN``;
+  ``N1`` is the credit line, except a line ``Licence:`` / ``License:`` which
+  is the metadata licence.
 * CSL-JSON: one item or an array; ``title``, ``author`` (``literal`` or
   ``family`` + ``given``), ``publisher``, ``issued`` (``date-parts``, ``raw``
-  or ``literal``), ``ISBN``.
+  or ``literal``), ``ISBN``; ``license`` (or ``licence``) is the metadata
+  licence, ``note`` the credit line.
 
 Several authors are joined with ``"; "`` — :func:`hondana.export.split_authors`
 splits on it, so ``dumps(loads(text))`` gives the same authors back. ISBNs
@@ -38,6 +43,9 @@ __all__ = ["from_bibtex", "from_ris", "from_csl", "loads", "sniff"]
 
 _YEAR = re.compile(r"\d{4}")
 _RIS_LINE = re.compile(r"^([A-Z][A-Z0-9])  -(?: (.*))?$")
+# Matches the ``Licence:`` prefix :data:`hondana.export.RIS_LICENCE_PREFIX`
+# writes, and the American spelling.
+_RIS_LICENCE = re.compile(r"^(?:Licence|License)\s*:\s*(.+)$")
 _BIBTEX_SKIP = {"comment", "string", "preamble"}
 
 # The inverse of export._BIBTEX_SPECIALS (plus the brace-less forms of the two
@@ -73,7 +81,28 @@ def _year(value: str) -> str:
     return m.group(0) if m else ""
 
 
-def _book(fmt: str, title: str, authors: List[str], publisher: str, year: str, isbn: str) -> Book:
+def _credits_from_n1(notes: List[str]) -> tuple[str, str]:
+    """Split RIS ``N1`` lines into (licence, attribution)."""
+    licence, lines = "", []
+    for value in notes:
+        m = _RIS_LICENCE.match(value)
+        if m and not licence:
+            licence = m.group(1).strip()
+        else:
+            lines.append(value)
+    return licence, "\n".join(lines)
+
+
+def _book(
+    fmt: str,
+    title: str,
+    authors: List[str],
+    publisher: str,
+    year: str,
+    isbn: str,
+    licence: str = "",
+    attribution: str = "",
+) -> Book:
     return Book(
         isbn=_isbn(isbn),
         title=title.strip(),
@@ -81,6 +110,8 @@ def _book(fmt: str, title: str, authors: List[str], publisher: str, year: str, i
         publisher=publisher.strip(),
         year=_year(year),
         source=fmt,
+        licence=(licence or "").strip(),
+        attribution=(attribution or "").strip(),
     )
 
 
@@ -158,6 +189,7 @@ def from_bibtex(text: str) -> List[Book]:
         books.append(_book(
             "bibtex", fields.get("title", ""), authors, fields.get("publisher", ""),
             fields.get("year", "") or fields.get("date", ""), fields.get("isbn", ""),
+            fields.get("copyright", ""), fields.get("note", ""),
         ))
     return books
 
@@ -202,7 +234,11 @@ def _ris_book(rec: Dict[str, List[str]]) -> Book:
                 return rec[t][0]
         return ""
     authors = rec.get("AU", []) + rec.get("A1", [])
-    return _book("ris", first("TI", "T1"), authors, first("PB"), first("PY", "Y1", "DA"), first("SN"))
+    licence, attribution = _credits_from_n1(rec.get("N1", []))
+    return _book(
+        "ris", first("TI", "T1"), authors, first("PB"), first("PY", "Y1", "DA"), first("SN"),
+        licence, attribution,
+    )
 
 
 # --- CSL-JSON ---------------------------------------------------------------
@@ -238,6 +274,8 @@ def from_csl(data: Any) -> List[Book]:
         books.append(_book(
             "csl", str(item.get("title") or ""), authors, str(item.get("publisher") or ""),
             _csl_year(item.get("issued")), str(item.get("ISBN") or ""),
+            str(item.get("license") or item.get("licence") or ""),
+            str(item.get("note") or ""),
         ))
     return books
 
@@ -261,7 +299,8 @@ def sniff(text: str) -> str:
 def loads(text: str, fmt: Optional[str] = None) -> List[Book]:
     """Parse ``text`` as ``bibtex``, ``ris`` or ``csl`` (guessed when ``fmt`` is None).
 
-    The inverse of :func:`hondana.export.dumps` for the fields it writes;
+    The inverse of :func:`hondana.export.dumps` for the fields it writes
+    (including licence and attribution when present);
     always returns a list, even for a single CSL object.
     """
     fmt = fmt or sniff(text)

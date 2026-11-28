@@ -255,14 +255,17 @@ assert csl.strip().startswith("[")
 ```
 
 From the shell: `python -m hondana lookup --format bibtex 9784003101018`
-(also `--format ris` and `--format csl`).
+(also `--format ris` and `--format csl`). Japan Search records also write the
+metadata licence and 出典 credit line into the entry (BibTeX `copyright` /
+`note`, RIS `N1`, CSL `license` / `note`); see [japan-search.md](japan-search.md).
 
 ## Read an exported list back in
 
 `loads()` (and `from_bibtex` / `from_ris` / `from_csl`) read the files the
 exporters above write, so a list can go lookup → `.bib` → hand edits → back
-into `Book` objects, or RIS → BibTeX. It only reads hondana's five fields
-(title, author, publisher, year, ISBN) and a conservative subset of each
+into `Book` objects, or RIS → BibTeX. It only reads hondana's fields
+(title, author, publisher, year, ISBN, and when present the metadata licence
+and 出典 credit line) and a conservative subset of each
 format: no `@string` macros, `#` concatenation or LaTeX accents. For arbitrary
 files use bibtexparser, rispy or citeproc-py.
 
