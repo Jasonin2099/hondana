@@ -58,6 +58,7 @@ python -m hondana lookup --merge --format table 978… 978…
 python -m hondana lookup --format bibtex 9784003101018   # 也可 ris / csl
 python -m hondana isbn --find < paper.txt | python -m hondana lookup   # 从 stdin 读 ISBN，默认每次间隔 0.5 秒（--rate 可改）
 python -m hondana search "吾輩は猫である"    # 按书名/作者搜（也可用 --title / --author）
+python -m hondana search "吾輩は猫である" --source ndl --source jpsearch   # 加上ジャパンサーチ：按各数据库条款过滤，表格下方列出出典；--jp-restricted / --jp-allow DB / --jp-accept cc-by-sa
 python -m hondana dedupe books.csv           # 按 ISBN 或折叠后的书名+作者报告重复组；--unique clean.csv 写出去重结果
 python -m hondana convert list.ris --to bibtex   # 读回导出的 BibTeX / RIS / CSL-JSON 并换成另一种格式（默认 JSON；--from 可指定输入格式）
 ```

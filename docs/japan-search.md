@@ -7,9 +7,9 @@ no key and returns JSON. `hondana.jpsearch` is a small client for it that
 **applies each database's own terms before you see a record**.
 
 Status: the client, the terms handling and the attribution model are in
-(`hondana.jpsearch`), and `search(sources=(..., "jpsearch"))` uses it (opt-in;
-the default sources are unchanged). The CLI flag is the next step (ROADMAP,
-Batch 4).
+(`hondana.jpsearch`); `search(sources=(..., "jpsearch"))` and
+`hondana search --source jpsearch` use it (opt-in; the default sources are
+unchanged).
 
 ## What the terms say
 
@@ -129,6 +129,20 @@ assert len(books) == 1 and skipped == {"nc": "licence cc-by-nc not in Policy.acc
 
 Exports (`to_bibtex` / `to_ris` / `to_csl`) do not carry the credit line yet;
 keep `book.attribution` next to anything you publish.
+
+## From the command line
+
+```sh
+python -m hondana search --title 吾輩は猫である --author 夏目漱石 --source jpsearch
+python -m hondana search 猫 --source ndl --source jpsearch --jp-restricted --jp-allow DB_ID --jp-accept cc-by-sa
+```
+
+The table is followed by a 出典 / Sources block (one line per credit; NDL
+data needs only one per database). `--format json` keeps `licence` and
+`attribution` on every object; with `bibtex` / `ris` / `csl` the credit lines
+go to stderr as `# title: 出典：…`. Skipped databases are reported on
+stderr (`# jpsearch: skipped database … (reason)`). `--jp-deny DB` leaves a
+database out.
 
 To use a CC BY-SA database, or one with its own terms, after reading them:
 

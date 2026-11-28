@@ -84,7 +84,10 @@ so we do not grow a citeproc, a full BibTeX parser, or a holdings search.
             attribution on the result — new optional `Book.licence` /
             `Book.attribution` (only in `to_dict()` when set),
             `jpsearch_policy`, `on_skip`; opt-in, default sources unchanged.
-      - [ ] CLI (`hondana search --source jpsearch`, credit lines in output).
+      - [x] CLI (`hondana search --source jpsearch`, credit lines in output) —
+            repeatable `--source`, `--jp-restricted`, `--jp-allow`,
+            `--jp-deny`, `--jp-accept`; 出典 / Sources block under the table,
+            credit lines on stderr for BibTeX / RIS / CSL, skips on stderr.
       - [ ] `lookup()`: keyword search on an ISBN is fuzzy, so only if an exact
             route exists (check the SPARQL endpoint first); otherwise document
             that ISBN lookup stays with openBD / NDL.

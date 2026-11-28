@@ -5,7 +5,7 @@
   ccode  — decode Japanese C-codes into 販売対象 / 発行形態 / 内容 (no network)
   ndc    — label NDC marks with their main class, 0 総記 … 9 文学 (no network)
   lookup — look ISBNs up across openBD / NDL / Google Books / Open Library
-  search — search by title or author (NDL Search, Open Library)
+  search — search by title or author (NDL Search, Open Library; Japan Search opt-in)
   dedupe — report (or drop) duplicate rows in a book-list CSV
   convert — read back BibTeX / RIS / CSL-JSON that hondana wrote (no network)
 """
@@ -211,13 +211,27 @@ def _cmd_search(a: argparse.Namespace) -> int:
     if not query and not title and not author:
         print("no query given", file=sys.stderr)
         return 1
+    sources = tuple(dict.fromkeys(a.source)) if a.source else ("ndl", "openlibrary")
+    policy = None
+    if "jpsearch" in sources:
+        from .jpsearch import DEFAULT_ACCEPT, Policy
+
+        policy = Policy(
+            accept=DEFAULT_ACCEPT | frozenset(a.jp_accept or ()),
+            allow=frozenset(a.jp_allow or ()),
+            deny=frozenset(a.jp_deny or ()),
+            restricted=a.jp_restricted,
+        )
     try:
         books = search(
             query,
             title=title,
             author=author,
             limit=a.limit,
+            sources=sources,
             on_error=lambda n, e: print(f"# {n}: {type(e).__name__}", file=sys.stderr),
+            jpsearch_policy=policy,
+            on_skip=lambda d, r: print(f"# jpsearch: skipped database {d} ({r})", file=sys.stderr),
         )
     except ValueError as e:
         print(str(e), file=sys.stderr)
@@ -226,12 +240,27 @@ def _cmd_search(a: argparse.Namespace) -> int:
     if not books:
         print("no results", file=sys.stderr)
         return 1
+    credits = [b for b in books if b.attribution]
     if fmt == "json":
+        # licence / attribution are part of each object
         print(json.dumps([b.to_dict() for b in books], ensure_ascii=False, indent=2))
     elif fmt in ("bibtex", "ris", "csl"):
         sys.stdout.write(dumps(books if len(books) > 1 else books[0], fmt))
+        # the export formats have no place for the credit line: keep it visible
+        for b in credits:
+            print(f"# {b.title}: {b.attribution}", file=sys.stderr)
     else:
         print(_format_table(books))
+        if credits:
+            print()
+            print("出典 / Sources:")
+            grouped: dict[tuple[str, str], list[str]] = {}
+            for b in credits:  # one line per credit (NDL data: one per database)
+                titles = grouped.setdefault((b.attribution, b.licence), [])
+                if b.title not in titles:
+                    titles.append(b.title)
+            for (line, licence), titles in grouped.items():
+                print(f"- {' / '.join(titles)} [{licence}]: {line}")
     return 0
 
 
@@ -420,12 +449,25 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     s = sub.add_parser(
         "search",
-        help="search by title or author (NDL Search, Open Library)",
+        help="search by title or author (NDL Search, Open Library; Japan Search with --source jpsearch)",
     )
     s.add_argument("query", nargs="*", help="free-text query; reads stdin when omitted")
     s.add_argument("--title", default="", help="search this title")
     s.add_argument("--author", default="", help="search this author / creator")
     s.add_argument("--limit", type=int, default=10, metavar="N", help="maximum hits (default 10)")
+    s.add_argument(
+        "--source", action="append", choices=("ndl", "openlibrary", "jpsearch"), metavar="NAME",
+        help="search this source (repeatable; ndl, openlibrary, jpsearch; default: ndl + openlibrary). "
+        "jpsearch = Japan Search, filtered by each database's terms; credit lines are printed",
+    )
+    s.add_argument("--jp-restricted", action="store_true",
+                   help="jpsearch: also use 一部項目利用不可 databases, without their restricted fields")
+    s.add_argument("--jp-allow", action="append", metavar="DB",
+                   help="jpsearch: database id whose own terms you have read and accept (repeatable)")
+    s.add_argument("--jp-deny", action="append", metavar="DB", help="jpsearch: never use this database (repeatable)")
+    s.add_argument("--jp-accept", action="append", metavar="LICENCE",
+                   choices=("cc-by-sa", "cc-by-nd", "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd"),
+                   help="jpsearch: also accept this licence (repeatable)")
     s.add_argument(
         "--format", choices=("json", "table", "bibtex", "ris", "csl"), default=None,
         help="output format (default: json for one hit, table for many)",

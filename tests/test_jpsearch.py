@@ -370,3 +370,73 @@ def test_search_source_errors_and_raw_and_timeouts():
     assert all(b.raw and json.loads(b.raw)["common"]["title"] == b.title for b in books)
     with pytest.raises(ValueError):
         search("猫", sources=("jpsearch", "nope"), fetch=fake())
+
+
+# --- CLI: hondana search --source jpsearch -----------------------------------
+
+def test_cli_search_jpsearch_table_prints_credit_lines(monkeypatch, capsys):
+    import hondana.__main__ as cli
+    real = cli.search
+
+    def patched(*a, **kw):
+        kw["fetch"] = fake()
+        return real(*a, **kw)
+
+    monkeypatch.setattr(cli, "search", patched)
+    assert cli.main(["search", "猫", "--source", "jpsearch", "--format", "table"]) == 0
+    out, err = capsys.readouterr()
+    assert "吾輩は猫である" in out and "Japan Search" in out
+    assert "出典 / Sources:" in out
+    assert "- 猫の本 [cc0]: 出典：ジャパンサーチ「ゼロ文庫（ゼロ図書館）」のメタデータ（https://jpsearch.go.jp/item/zero-1）" in out
+    assert "# jpsearch: skipped database closed (API use not allowed (apiType=ng))" in err
+    assert "非営利の猫" not in out
+
+
+def test_cli_search_jpsearch_policy_flags_and_exports(monkeypatch, capsys):
+    import hondana.__main__ as cli
+    real = cli.search
+    seen = {}
+
+    def patched(*a, **kw):
+        seen.update(kw)
+        kw["fetch"] = fake()
+        return real(*a, **kw)
+
+    monkeypatch.setattr(cli, "search", patched)
+    rc = cli.main(["search", "猫", "--source", "jpsearch", "--source", "jpsearch", "--jp-restricted",
+                   "--jp-allow", "own", "--jp-accept", "cc-by-nc-sa", "--jp-deny", "zero", "--format", "ris"])
+    assert rc == 0
+    pol = seen["jpsearch_policy"]
+    assert seen["sources"] == ("jpsearch",)
+    assert pol.restricted and pol.allow == {"own"} and pol.deny == {"zero"} and "cc-by-nc-sa" in pol.accept
+    out, err = capsys.readouterr()
+    assert "TI  - 非営利の猫" in out and "猫の本" not in out
+    assert "# 非営利の猫: 出典：ジャパンサーチ" in err  # credit line kept on stderr
+    rc = cli.main(["search", "猫", "--source", "jpsearch", "--format", "json"])
+    data = json.loads(capsys.readouterr().out)
+    assert rc == 0 and all(d["source"] == "Japan Search" and d["attribution"] for d in data)
+
+
+def test_cli_search_default_sources_have_no_policy(monkeypatch, capsys):
+    import hondana.__main__ as cli
+    seen = {}
+
+    def patched(*a, **kw):
+        seen.update(kw)
+        return []
+
+    monkeypatch.setattr(cli, "search", patched)
+    assert cli.main(["search", "猫"]) == 1
+    assert seen["sources"] == ("ndl", "openlibrary") and seen["jpsearch_policy"] is None
+
+
+def test_cli_search_same_credit_line_printed_once(monkeypatch, capsys):
+    import hondana.__main__ as cli
+    from hondana import Book
+
+    books = [Book("", t, source="Japan Search", licence="cc-by", attribution="出典：X（https://jpsearch.go.jp/database/x）")
+             for t in ("上巻", "下巻", "上巻")]
+    monkeypatch.setattr(cli, "search", lambda *a, **kw: books)
+    assert cli.main(["search", "猫", "--source", "jpsearch", "--format", "table"]) == 0
+    out = capsys.readouterr().out
+    assert out.count("出典：X") == 1 and "- 上巻 / 下巻 [cc-by]: 出典：X" in out
