@@ -323,6 +323,9 @@ def _merge_books(books: "list[Book]") -> Book:
                 used = True
         if used and b.source and b.source not in contributors:
             contributors.append(b.source)
+        if used and b.attribution and not out.attribution:
+            # a field came from a source that asks for credit: keep its line
+            out.licence, out.attribution = b.licence, b.attribution
         if out.raw is None and b.raw is not None:
             out.raw = b.raw
     out.source = "+".join(contributors)
@@ -338,6 +341,8 @@ def lookup(
     timeouts: Optional["dict[str, float]"] = None,
     raw: bool = False,
     merge: bool = False,
+    jpsearch_policy: Optional[Any] = None,
+    on_skip: Optional[Callable[[str, str], None]] = None,
 ) -> Optional[Book]:
     """Look an ISBN up. Returns ``None`` for an invalid ISBN or when no source knows it.
 
@@ -351,11 +356,17 @@ def lookup(
     ``merge=True`` queries every source in ``order`` and fills missing fields from
     later ones (first non-empty wins per field). Default ``False`` keeps the
     first-wins behaviour.
+
+    ``"jpsearch"`` (Japan Search) is opt-in: ``order=(..., "jpsearch")``.
+    It matches the ISBN exactly through the SPARQL endpoint, applies each
+    database's terms (``jpsearch_policy``, ``on_skip`` as in :func:`search`)
+    and fills ``Book.licence`` / ``Book.attribution``; with ``merge=True``
+    the credit line is kept when one of its fields was used.
     """
     isbn = to_isbn13(raw_isbn, strict=True)
     if not isbn:
         return None
-    unknown = set(timeouts or ()) - set(SOURCES)
+    unknown = set(timeouts or ()) - set(SOURCES) - {"jpsearch"}
     if unknown:
         raise ValueError(f"unknown source(s) in timeouts: {', '.join(sorted(unknown))}")
     found: "list[Book]" = []
@@ -365,13 +376,16 @@ def lookup(
         if raw:
             f = _recording(f, last)
         try:
-            b = SOURCES[name](isbn, f)
+            if name == "jpsearch":
+                b = _jpsearch_lookup(isbn, f, jpsearch_policy, on_skip, raw)
+            else:
+                b = SOURCES[name](isbn, f)
         except Exception as e:  # network, JSON, anything: next source
             if on_error:
                 on_error(name, e)
             continue
         if b:
-            if raw and last:
+            if raw and last and b.raw is None:
                 b.raw = last[-1]
             if not merge:
                 return b
@@ -392,6 +406,8 @@ def lookup_many(
     merge: bool = False,
     rate: float = 0.0,
     sleep: Callable[[float], None] = time.sleep,
+    jpsearch_policy: Optional[Any] = None,
+    on_skip: Optional[Callable[[str, str], None]] = None,
 ) -> "list[Optional[Book]]":
     """Look up many ISBNs; one ``Book|None`` per input, preserving order.
 
@@ -412,6 +428,8 @@ def lookup_many(
                 timeouts=timeouts,
                 raw=raw,
                 merge=merge,
+                jpsearch_policy=jpsearch_policy,
+                on_skip=on_skip,
             )
         )
     return out
@@ -514,6 +532,22 @@ def _ol_search(query: str, title: str, author: str, fetch: Fetch, limit: int) ->
         if len(out) >= limit:
             break
     return out
+
+
+def _jpsearch_lookup(
+    isbn: str, fetch: Fetch, policy: Any, on_skip: Optional[Callable[[str, str], None]], raw: bool = False
+) -> Optional[Book]:
+    """``lookup()`` source for Japan Search: the first record that passes the policy."""
+    from .jpsearch import JapanSearch, Policy
+
+    client = JapanSearch(fetch, policy if policy is not None else Policy(), on_skip=on_skip)
+    recs = client.lookup(isbn, limit=1, raw=raw)
+    if not recs:
+        return None
+    b = recs[0].to_book()
+    if raw and recs[0].raw is not None:
+        b.raw = json.dumps(recs[0].raw, ensure_ascii=False)
+    return b
 
 
 def _jpsearch_source(policy: Any, on_skip: Optional[Callable[[str, str], None]], raw: bool) -> Any:

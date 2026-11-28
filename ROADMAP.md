@@ -72,7 +72,7 @@ so we do not grow a citeproc, a full BibTeX parser, or a holdings search.
       rispy already exist for the general case). — `hondana.reimport`:
       `loads()` (format guessed) and the three readers; CLI `hondana convert`;
       `dumps(loads(text))` round-trips our own exports (tested).
-- [ ] Optional Japan Search (ジャパンサーチ) source for `search()` / `lookup()`,
+- [x] Optional Japan Search (ジャパンサーチ) source for `search()` / `lookup()`,
       after checking the API terms. Complements NDL; no holdings / Calil.
       Terms checked 2026-11-26; user chose full integration, per database.
       - [x] Client + per-database terms (`hondana.jpsearch`): `apiType` ng and
@@ -88,9 +88,12 @@ so we do not grow a citeproc, a full BibTeX parser, or a holdings search.
             repeatable `--source`, `--jp-restricted`, `--jp-allow`,
             `--jp-deny`, `--jp-accept`; 出典 / Sources block under the table,
             credit lines on stderr for BibTeX / RIS / CSL, skips on stderr.
-      - [ ] `lookup()`: keyword search on an ISBN is fuzzy, so only if an exact
+      - [x] `lookup()`: keyword search on an ISBN is fuzzy, so only if an exact
             route exists (check the SPARQL endpoint first); otherwise document
-            that ISBN lookup stays with openBD / NDL.
+            that ISBN lookup stays with openBD / NDL. — exact route found:
+            `schema:identifier` "ISBN:…" (10/13 digits, with/without hyphens)
+            via SPARQL; `JapanSearch.lookup()`, `isbn_literals()`,
+            `lookup(order=(..., "jpsearch"))`, `hondana lookup --source`.
 - [x] When hyphenating an ISBN, also print the registration-group name (Japan,
       English-language, …). The official RangeMessage table we already ship
       has the group data. — `registration_group()`, `hondana isbn --group`,

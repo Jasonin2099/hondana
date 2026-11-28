@@ -452,3 +452,135 @@ def test_cli_search_same_credit_line_printed_once(monkeypatch, capsys):
     assert cli.main(["search", "猫", "--source", "jpsearch", "--format", "table"]) == 0
     out = capsys.readouterr().out
     assert out.count("出典：X") == 1 and "- 上巻 / 下巻 [cc-by]: 出典：X" in out
+
+
+# --- exact ISBN route (SPARQL) and lookup(order=(..., "jpsearch")) -----------
+
+from hondana import lookup  # noqa: E402
+from hondana.jpsearch import isbn_literals  # noqa: E402
+
+
+def sparql(*uris):
+    return (200, json.dumps({"head": {"vars": ["s"]}, "results": {"bindings": [
+        {"s": {"type": "uri", "value": u}} for u in uris]}}))
+
+
+DIGNL_LIKE = item("natbib", 9, "海の道と東西の出会い", ["青木康征 著"], ["1998.2", "1998"], provider="natlib")
+OWN_ITEM = item("own", 3, "独自規約の海")
+
+
+def isbn_routes(**extra):
+    r = {
+        "/database/search": (200, json.dumps(DATABASES)),
+        "/organization/search": (200, json.dumps(ORGS)),
+        "/rdf/sparql/": sparql(
+            "https://jpsearch.go.jp/data/closed-5",
+            "https://jpsearch.go.jp/data/own-3",
+            "https://jpsearch.go.jp/data/natbib-9",
+            "https://jpsearch.go.jp/data/natbib-9#accessinfo",
+            "https://example.org/other",
+        ),
+        "/item/natbib-9": (200, json.dumps(DIGNL_LIKE)),
+        "/item/own-3": (200, json.dumps(OWN_ITEM)),
+    }
+    r.update(extra)
+    return r
+
+
+def test_isbn_literals_cover_the_spellings_in_the_data():
+    assert isbn_literals("978-4-00-310101-8") == [
+        "ISBN:9784003101018", "ISBN:978-4-00-310101-8", "ISBN:4003101014", "ISBN:4-00-310101-4"]
+    assert isbn_literals("9791032300824") == ["ISBN:9791032300824", "ISBN:979-10-323-0082-4"]
+    assert isbn_literals("4003101015") == []
+
+
+def test_item_ids_for_isbn_queries_exact_identifiers():
+    calls = []
+    js = JapanSearch(fake(calls, isbn_routes()))
+    assert js.item_ids_for_isbn("4634342502") == ["closed-5", "own-3", "natbib-9"]
+    url, params = calls[0]
+    assert url == "https://jpsearch.go.jp/rdf/sparql/" and params["format"] == "json"
+    assert '"ISBN:4-634-34250-2"' in params["query"] and "schema:identifier" in params["query"]
+    assert js.item_ids_for_isbn("bad") == [] and len(calls) == 1
+
+
+def test_lookup_skips_by_policy_before_fetching_items():
+    calls, skipped = [], {}
+    js = JapanSearch(fake(calls, isbn_routes()), on_skip=skipped.__setitem__)
+    recs = js.lookup("4-634-34250-2")
+    assert [r.id for r in recs] == ["natbib-9"]
+    r = recs[0]
+    assert r.isbn == "9784634342507" and r.licence == "cc-by" and r.attribution.endswith("/database/natbib）")
+    fetched = [u for u, _ in calls if "/item/" in u]
+    assert fetched == ["https://jpsearch.go.jp/api/item/natbib-9"]  # closed / own never fetched
+    assert set(skipped) == {"closed", "own"}
+    assert JapanSearch(fake(routes=isbn_routes()), Policy(allow=frozenset({"own"}))).lookup(
+        "4634342502", limit=1)[0].id == "own-3"
+
+
+def test_lookup_item_gone_or_no_hits():
+    routes = isbn_routes(**{"/item/natbib-9": (404, "")})
+    assert JapanSearch(fake(routes=routes)).lookup("4634342502") == []
+    routes = isbn_routes(**{"/rdf/sparql/": sparql()})
+    assert JapanSearch(fake(routes=routes)).lookup("4634342502") == []
+    with pytest.raises(RuntimeError):
+        JapanSearch(fake(routes=isbn_routes(**{"/rdf/sparql/": (503, "")}))).lookup("4634342502")
+
+
+def test_hondana_lookup_with_jpsearch_source():
+    b = lookup("4634342502", order=("jpsearch",), fetch=fake(routes=isbn_routes()))
+    assert (b.isbn, b.title, b.source, b.licence) == ("9784634342507", "海の道と東西の出会い", "Japan Search", "cc-by")
+    assert b.attribution.startswith("出典：ジャパンサーチ「全国書誌（国立図書館）」")
+    b = lookup("4634342502", order=("jpsearch",), fetch=fake(routes=isbn_routes()), raw=True)
+    assert json.loads(b.raw)["id"] == "natbib-9"
+    skipped = []
+    assert lookup("4634342502", order=("jpsearch",), fetch=fake(routes=isbn_routes()),
+                  jpsearch_policy=Policy(deny=frozenset({"natbib"})), on_skip=lambda d, r: skipped.append(d)) is None
+    assert "natbib" in skipped
+
+
+def test_hondana_lookup_merge_keeps_credit_only_when_used():
+    openbd = (200, json.dumps([{"summary": {"title": "海の道と東西の出会い", "author": "青木康征", "publisher": "", "pubdate": ""}}]))
+    jp = fake(routes=isbn_routes())
+
+    def fetch(url, params, timeout):
+        return openbd if "openbd" in url else jp(url, params, timeout)
+
+    b = lookup("4634342502", order=("openbd", "jpsearch"), fetch=fetch, merge=True)
+    assert b.source == "openBD+Japan Search" and b.year == "1998" and b.attribution  # year came from Japan Search
+    full = (200, json.dumps([{"summary": {"title": "海", "author": "a", "publisher": "p", "pubdate": "1998", "cover": "https://c"}}]))
+    b = lookup("4634342502", order=("openbd", "jpsearch"), merge=True,
+               fetch=lambda u, p, t: full if "openbd" in u else jp(u, p, t))
+    assert b.source == "openBD" and b.attribution == "" and b.licence == ""
+
+
+def test_cli_lookup_source_jpsearch(monkeypatch, capsys):
+    import hondana.__main__ as cli
+    real = cli.lookup_many
+    seen = {}
+
+    def patched(*a, **kw):
+        seen.update(kw)
+        kw["fetch"] = fake(routes=isbn_routes())
+        kw["rate"] = 0
+        return real(*a, **kw)
+
+    monkeypatch.setattr(cli, "lookup_many", patched)
+    assert cli.main(["lookup", "4634342502", "--source", "jpsearch", "--format", "table"]) == 0
+    out, err = capsys.readouterr()
+    assert seen["order"] == ("jpsearch",) and seen["jpsearch_policy"] is not None
+    assert "海の道と東西の出会い" in out and "出典 / Sources:" in out
+    assert "# jpsearch: skipped database closed" in err
+    assert cli.main(["lookup", "4634342502", "--source", "jpsearch", "--jp-allow", "own", "--format", "bibtex"]) == 0
+    out, err = capsys.readouterr()
+    assert "# 独自規約の海: 出典：ジャパンサーチ「ownデータベース」" in err  # first allowed hit
+    assert seen["jpsearch_policy"].allow == {"own"}
+
+
+def test_cli_lookup_default_order_unchanged(monkeypatch, capsys):
+    import hondana.__main__ as cli
+    from hondana.lookup import DEFAULT_ORDER
+    seen = {}
+    monkeypatch.setattr(cli, "lookup_many", lambda *a, **kw: seen.update(kw) or [None])
+    assert cli.main(["lookup", "9784003101018"]) == 1
+    assert seen["order"] == DEFAULT_ORDER and seen["jpsearch_policy"] is None

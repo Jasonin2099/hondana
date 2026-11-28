@@ -14,14 +14,14 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence
 
 from .ccode import decode_ccode
 from .ndc import ndc_class
 from .isbn import find_isbns, hyphenate, is_valid, registration_group, to_isbn13
 from .export import dumps
 from .reimport import loads
-from .lookup import Book
+from .lookup import DEFAULT_ORDER, Book
 from .dedupe import _AUTHOR_ALIASES, _ISBN_ALIASES, _TITLE_ALIASES, dedupe, resolve_field
 from . import fold, fold_steps, lookup_many, search
 
@@ -168,16 +168,74 @@ def _format_table(books: list[Book]) -> str:
     return "\n".join(lines)
 
 
+def _jp_policy(a: argparse.Namespace, sources: "tuple[str, ...]") -> Any:
+    """The Japan Search ``Policy`` from the --jp-* flags, or ``None``."""
+    if "jpsearch" not in sources:
+        return None
+    from .jpsearch import DEFAULT_ACCEPT, Policy
+
+    return Policy(
+        accept=DEFAULT_ACCEPT | frozenset(a.jp_accept or ()),
+        allow=frozenset(a.jp_allow or ()),
+        deny=frozenset(a.jp_deny or ()),
+        restricted=a.jp_restricted,
+    )
+
+
+def _print_skip(db: str, reason: str) -> None:
+    print(f"# jpsearch: skipped database {db} ({reason})", file=sys.stderr)
+
+
+def _print_credits(books: "list[Book]", fmt: str) -> None:
+    """Credit lines of sources that ask for one (Japan Search).
+
+    JSON already carries ``attribution``; under a table they are a 出典 block
+    (one line per credit); the export formats have no place for them, so
+    they go to stderr.
+    """
+    credits = [b for b in books if b.attribution]
+    if not credits or fmt == "json":
+        return
+    if fmt in ("bibtex", "ris", "csl"):
+        for b in credits:
+            print(f"# {b.title}: {b.attribution}", file=sys.stderr)
+        return
+    print()
+    print("出典 / Sources:")
+    grouped: dict[tuple[str, str], list[str]] = {}
+    for b in credits:  # NDL data: one line per database
+        titles = grouped.setdefault((b.attribution, b.licence), [])
+        if b.title not in titles:
+            titles.append(b.title)
+    for (line, licence), titles in grouped.items():
+        print(f"- {' / '.join(titles)} [{licence}]: {line}")
+
+
+def _add_jp_flags(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--jp-restricted", action="store_true",
+                   help="jpsearch: also use 一部項目利用不可 databases, without their restricted fields")
+    p.add_argument("--jp-allow", action="append", metavar="DB",
+                   help="jpsearch: database id whose own terms you have read and accept (repeatable)")
+    p.add_argument("--jp-deny", action="append", metavar="DB", help="jpsearch: never use this database (repeatable)")
+    p.add_argument("--jp-accept", action="append", metavar="LICENCE",
+                   choices=("cc-by-sa", "cc-by-nd", "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd"),
+                   help="jpsearch: also accept this licence (repeatable)")
+
+
 def _cmd_lookup(a: argparse.Namespace) -> int:
     isbns = list(a.isbn) or _read_text(()).split()
     if not isbns:
         print("no ISBN given", file=sys.stderr)
         return 1
+    order = tuple(dict.fromkeys(a.source)) if a.source else DEFAULT_ORDER
     books = lookup_many(
         isbns,
         merge=a.merge,
         rate=a.rate,
+        order=order,
         on_error=lambda n, e: print(f"# {n}: {type(e).__name__}", file=sys.stderr),
+        jpsearch_policy=_jp_policy(a, order),
+        on_skip=_print_skip,
     )
     found = [b for b in books if b]
     missing = [isbn for isbn, b in zip(isbns, books) if b is None]
@@ -197,6 +255,7 @@ def _cmd_lookup(a: argparse.Namespace) -> int:
             sys.stdout.write(dumps(found if len(isbns) > 1 else found[0], fmt))
         else:
             print(_format_table(found))
+        _print_credits(found, fmt)
 
     if not found:
         return 1
@@ -212,16 +271,7 @@ def _cmd_search(a: argparse.Namespace) -> int:
         print("no query given", file=sys.stderr)
         return 1
     sources = tuple(dict.fromkeys(a.source)) if a.source else ("ndl", "openlibrary")
-    policy = None
-    if "jpsearch" in sources:
-        from .jpsearch import DEFAULT_ACCEPT, Policy
-
-        policy = Policy(
-            accept=DEFAULT_ACCEPT | frozenset(a.jp_accept or ()),
-            allow=frozenset(a.jp_allow or ()),
-            deny=frozenset(a.jp_deny or ()),
-            restricted=a.jp_restricted,
-        )
+    policy = _jp_policy(a, sources)
     try:
         books = search(
             query,
@@ -231,7 +281,7 @@ def _cmd_search(a: argparse.Namespace) -> int:
             sources=sources,
             on_error=lambda n, e: print(f"# {n}: {type(e).__name__}", file=sys.stderr),
             jpsearch_policy=policy,
-            on_skip=lambda d, r: print(f"# jpsearch: skipped database {d} ({r})", file=sys.stderr),
+            on_skip=_print_skip,
         )
     except ValueError as e:
         print(str(e), file=sys.stderr)
@@ -240,27 +290,13 @@ def _cmd_search(a: argparse.Namespace) -> int:
     if not books:
         print("no results", file=sys.stderr)
         return 1
-    credits = [b for b in books if b.attribution]
     if fmt == "json":
-        # licence / attribution are part of each object
         print(json.dumps([b.to_dict() for b in books], ensure_ascii=False, indent=2))
     elif fmt in ("bibtex", "ris", "csl"):
         sys.stdout.write(dumps(books if len(books) > 1 else books[0], fmt))
-        # the export formats have no place for the credit line: keep it visible
-        for b in credits:
-            print(f"# {b.title}: {b.attribution}", file=sys.stderr)
     else:
         print(_format_table(books))
-        if credits:
-            print()
-            print("出典 / Sources:")
-            grouped: dict[tuple[str, str], list[str]] = {}
-            for b in credits:  # one line per credit (NDL data: one per database)
-                titles = grouped.setdefault((b.attribution, b.licence), [])
-                if b.title not in titles:
-                    titles.append(b.title)
-            for (line, licence), titles in grouped.items():
-                print(f"- {' / '.join(titles)} [{licence}]: {line}")
+    _print_credits(books, fmt)
     return 0
 
 
@@ -413,6 +449,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                    help="minimum seconds between lookups (default 0.5; be kind to free APIs)")
     l.add_argument("--merge", action="store_true", help="fill missing fields from later sources")
     l.add_argument(
+        "--source", action="append", choices=("openbd", "ndl", "google", "openlibrary", "cinii", "jpsearch"),
+        metavar="NAME",
+        help="sources in this order (repeatable; openbd, ndl, google, openlibrary, cinii, jpsearch; "
+        "default: openbd ndl google openlibrary). jpsearch = Japan Search, exact ISBN match, "
+        "filtered by each database's terms; credit lines are printed",
+    )
+    _add_jp_flags(l)
+    l.add_argument(
         "--format", choices=("json", "table", "bibtex", "ris", "csl"), default=None,
         help="output format (default: json for one ISBN, table for many)",
     )
@@ -460,14 +504,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="search this source (repeatable; ndl, openlibrary, jpsearch; default: ndl + openlibrary). "
         "jpsearch = Japan Search, filtered by each database's terms; credit lines are printed",
     )
-    s.add_argument("--jp-restricted", action="store_true",
-                   help="jpsearch: also use 一部項目利用不可 databases, without their restricted fields")
-    s.add_argument("--jp-allow", action="append", metavar="DB",
-                   help="jpsearch: database id whose own terms you have read and accept (repeatable)")
-    s.add_argument("--jp-deny", action="append", metavar="DB", help="jpsearch: never use this database (repeatable)")
-    s.add_argument("--jp-accept", action="append", metavar="LICENCE",
-                   choices=("cc-by-sa", "cc-by-nd", "cc-by-nc", "cc-by-nc-sa", "cc-by-nc-nd"),
-                   help="jpsearch: also accept this licence (repeatable)")
+    _add_jp_flags(s)
     s.add_argument(
         "--format", choices=("json", "table", "bibtex", "ris", "csl"), default=None,
         help="output format (default: json for one hit, table for many)",

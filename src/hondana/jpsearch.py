@@ -27,7 +27,9 @@ This module reads those conditions from the API itself and applies a
 
 Only standard-library code; pass your own ``fetch`` as elsewhere in hondana.
 Keyword search on an ISBN is fuzzy on Japan Search (it matches unrelated
-records), so this module searches by title / author only.
+records), so :meth:`JapanSearch.search` takes title / author and
+:meth:`JapanSearch.lookup` finds an ISBN through the SPARQL endpoint,
+matching the ``schema:identifier`` value exactly.
 
 >>> classify_rights("<p>CC BY4.0 で利用できます。</p>")
 ('cc-by', False)
@@ -48,7 +50,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tuple
 
 from .lookup import Book, Fetch, urllib_fetch
-from .isbn import to_isbn13
+from .isbn import hyphenate, to_isbn10, to_isbn13
 
 __all__ = [
     "API",
@@ -57,6 +59,7 @@ __all__ = [
     "Record",
     "JapanSearch",
     "classify_rights",
+    "isbn_literals",
     "parse_database",
     "attribution",
     "DEFAULT_ACCEPT",
@@ -64,6 +67,7 @@ __all__ = [
 
 API = "https://jpsearch.go.jp/api"
 SITE = "https://jpsearch.go.jp"
+SPARQL = "https://jpsearch.go.jp/rdf/sparql/"
 
 #: Licences accepted by default. All allow reuse (also commercial) with at
 #: most an attribution duty. Add e.g. ``"cc-by-sa"`` or ``"cc-by-nc"`` to
@@ -178,6 +182,29 @@ def parse_database(d: Dict[str, Any]) -> Database:
         caveat=caveat,
         no_record_notice="個別のメタデータに表示を行う必要はありません" in ja,
     )
+
+
+def isbn_literals(isbn: str) -> List[str]:
+    """The ``schema:identifier`` spellings of an ISBN in Japan Search's RDF.
+
+    >>> isbn_literals("4634342502")
+    ['ISBN:9784634342507', 'ISBN:978-4-634-34250-7', 'ISBN:4634342502', 'ISBN:4-634-34250-2']
+    >>> isbn_literals("not an isbn")
+    []
+    """
+    isbn13 = to_isbn13(isbn, strict=True)
+    if not isbn13:
+        return []
+    forms = [isbn13]
+    h13 = hyphenate(isbn13)
+    if h13:
+        forms.append(h13)
+    i10 = to_isbn10(isbn13)
+    if i10:
+        forms.append(i10)
+        if h13:
+            forms.append(h13[4:-1] + i10[-1])
+    return ["ISBN:" + f for f in dict.fromkeys(forms)]
 
 
 def attribution(db: Database, item_id: str = "", *, modified: bool = False, lang: str = "ja") -> str:
@@ -476,31 +503,94 @@ class JapanSearch:
         if kind:
             params["f-type"] = kind
         data = self._get("/item/search/jps-cross", params) or {}
-        dbs = self.databases()
         out: List[Record] = []
         for item in data.get("list") or []:
-            if not isinstance(item, dict):
-                continue
-            common = item.get("common") or {}
-            db_id = str(common.get("database") or "")
-            db = dbs.get(db_id)
-            reason = self.policy.reason_to_skip(db)
-            if not reason and db is not None and str(common.get("apiType") or db.api_type) == "ng":
-                reason = "API use not allowed (apiType=ng)"
-            if reason or db is None:
-                self._skip(db_id, reason)
-                continue
-            blocked = self.blocked_fields(db_id) if db.api_type == "restricted" else frozenset()
-            org = str(common.get("provider") or "")
-            if not db.provider and org:
-                name = self.organizations().get(org, "")
-                if name:
-                    db = replace(db, provider=name)
-            rec = _record(item, db, blocked)
+            rec = self._accept(item, raw)
             if rec is None:
                 continue
-            if raw:
-                rec.raw = item
+            out.append(rec)
+            if len(out) >= limit:
+                break
+        return out
+
+    def _accept(self, item: Any, raw: bool) -> Optional[Record]:
+        """Apply the policy to one API item; the :class:`Record` or ``None``."""
+        if not isinstance(item, dict):
+            return None
+        common = item.get("common") or {}
+        db_id = str(common.get("database") or "")
+        db = self.databases().get(db_id)
+        reason = self.policy.reason_to_skip(db)
+        if not reason and db is not None and str(common.get("apiType") or db.api_type) == "ng":
+            reason = "API use not allowed (apiType=ng)"
+        if reason or db is None:
+            self._skip(db_id, reason)
+            return None
+        blocked = self.blocked_fields(db_id) if db.api_type == "restricted" else frozenset()
+        org = str(common.get("provider") or "")
+        if not db.provider and org:
+            name = self.organizations().get(org, "")
+            if name:
+                db = replace(db, provider=name)
+        rec = _record(item, db, blocked)
+        if rec is not None and raw:
+            rec.raw = item
+        return rec
+
+    def item_ids_for_isbn(self, isbn: str) -> List[str]:
+        """Item ids whose ``schema:identifier`` is exactly this ISBN.
+
+        Uses the SPARQL endpoint (the keyword API is fuzzy for ISBNs) and
+        asks for the spellings found in the data: ``ISBN:`` followed by the
+        ISBN-13 or ISBN-10, plain or hyphenated. ``[]`` for an invalid ISBN.
+        """
+        literals = isbn_literals(isbn)
+        if not literals:
+            return []
+        values = " ".join(json.dumps(v, ensure_ascii=False) for v in literals)
+        query = (
+            "PREFIX schema: <http://schema.org/> SELECT DISTINCT ?s WHERE { "
+            f"VALUES ?id {{ {values} }} ?s schema:identifier ?id }} LIMIT 50"
+        )
+        st, body = self.fetch(SPARQL, {"query": query, "format": "json"}, self.timeout)
+        if st != 200:
+            raise RuntimeError(f"Japan Search SPARQL: HTTP {st}")
+        rows = ((json.loads(body or "null") or {}).get("results") or {}).get("bindings") or []
+        ids: List[str] = []
+        for row in rows:
+            uri = str(((row or {}).get("s") or {}).get("value") or "")
+            if uri.startswith(SITE + "/data/"):
+                item_id = uri[len(SITE + "/data/"):].split("#", 1)[0]
+                if item_id and item_id not in ids:
+                    ids.append(item_id)
+        return ids
+
+    def lookup(self, isbn: str, *, limit: int = 5, raw: bool = False) -> List[Record]:
+        """Records whose identifier is exactly ``isbn``, after the policy.
+
+        Databases the policy skips are left out before their items are
+        fetched (the database id is the item id's prefix). Every record gets
+        ``isbn`` (normalised to 13 digits) since the identifier matched.
+        """
+        isbn13 = to_isbn13(isbn, strict=True)
+        if not isbn13:
+            return []
+        dbs = self.databases()
+        out: List[Record] = []
+        for item_id in self.item_ids_for_isbn(isbn13):
+            db_id = item_id.split("-", 1)[0]
+            reason = self.policy.reason_to_skip(dbs.get(db_id))
+            if reason:
+                self._skip(db_id, reason)
+                continue
+            try:
+                item = self._get(f"/item/{item_id}")
+            except RuntimeError:  # gone, or withheld from the API
+                continue
+            rec = self._accept(item, raw)
+            if rec is None:
+                continue
+            rec.isbn = isbn13
             out.append(rec)
             if len(out) >= limit:
                 break

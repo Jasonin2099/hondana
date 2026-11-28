@@ -7,9 +7,10 @@ no key and returns JSON. `hondana.jpsearch` is a small client for it that
 **applies each database's own terms before you see a record**.
 
 Status: the client, the terms handling and the attribution model are in
-(`hondana.jpsearch`); `search(sources=(..., "jpsearch"))` and
-`hondana search --source jpsearch` use it (opt-in; the default sources are
-unchanged).
+(`hondana.jpsearch`); `search(sources=(..., "jpsearch"))`,
+`lookup(isbn, order=(..., "jpsearch"))` and `--source jpsearch` on the
+`search` / `lookup` commands use it. Opt-in: the default sources are
+unchanged.
 
 ## What the terms say
 
@@ -54,9 +55,25 @@ The classification reads the licence text conservatively: anything it cannot
 place is `custom` and stays out until you decide. Check `js.skipped` (or pass
 `on_skip`) to see which databases were left out and why.
 
+## ISBN lookup
+
 Keyword search on an ISBN is fuzzy on Japan Search (a search for one ISBN
-returns hundreds of unrelated records), so the client searches by title and
-author only; ISBN lookup stays with openBD / NDL Search.
+returns hundreds of unrelated records), so `JapanSearch.search()` takes a
+title and author. For an ISBN, `JapanSearch.lookup()` asks the
+[SPARQL endpoint](https://jpsearch.go.jp/rdf/sparql/) for items whose
+`schema:identifier` is exactly that ISBN. The RDF writes it as `ISBN:` plus
+the ISBN-10 or ISBN-13, with or without hyphens (`ISBN:4-634-34250-2`,
+`ISBN:4634342502`), so all four spellings are asked for at once
+(`isbn_literals()`). Databases the policy skips are left out before their
+items are fetched; each remaining item comes from `/api/item/{id}` and goes
+through the same checks as a search hit. One SPARQL request plus one per
+item; `lookup()` in hondana stops at the first record that passes.
+
+Coverage is whatever the databases put in `schema:identifier`: mostly NDL
+Digital Collections (dignl) and some library catalogues. The 全国書誌 (bibnl)
+records carry a JPNO there instead, so for new books openBD / NDL Search
+remain the better sources; Japan Search is an extra for older or digitised
+books.
 
 ## Example
 
@@ -130,11 +147,37 @@ assert len(books) == 1 and skipped == {"nc": "licence cc-by-nc not in Policy.acc
 Exports (`to_bibtex` / `to_ris` / `to_csl`) do not carry the credit line yet;
 keep `book.attribution` next to anything you publish.
 
+## From `lookup()`
+
+```python
+import json
+from hondana import lookup
+
+def stub(url, params, timeout):
+    if url.endswith("/database/search"):
+        return 200, json.dumps({"list": [{"id": "zero", "name": {"ja": "ゼロ文庫"}, "apiType": "ok"}]})
+    if url.endswith("/rdf/sparql/"):
+        assert '"ISBN:4-634-34250-2"' in params["query"]
+        return 200, json.dumps({"results": {"bindings": [{"s": {"value": "https://jpsearch.go.jp/data/zero-3"}}]}})
+    if url.endswith("/item/zero-3"):
+        return 200, json.dumps({"id": "zero-3", "common": {"id": "zero-3", "database": "zero",
+                                "title": "海の道と東西の出会い", "temporal": ["1998"]}})
+    return 404, ""
+
+b = lookup("4634342502", order=("jpsearch",), fetch=stub)
+assert (b.isbn, b.year, b.source, b.licence) == ("9784634342507", "1998", "Japan Search", "cc0")
+assert b.attribution.endswith("（https://jpsearch.go.jp/item/zero-3）")
+```
+
+With `merge=True` the credit line is kept on the merged book when at least
+one of its fields came from Japan Search.
+
 ## From the command line
 
 ```sh
 python -m hondana search --title 吾輩は猫である --author 夏目漱石 --source jpsearch
 python -m hondana search 猫 --source ndl --source jpsearch --jp-restricted --jp-allow DB_ID --jp-accept cc-by-sa
+python -m hondana lookup 9784003101018 --source openbd --source ndl --source jpsearch --merge
 ```
 
 The table is followed by a 出典 / Sources block (one line per credit; NDL
