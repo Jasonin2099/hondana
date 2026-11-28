@@ -80,8 +80,10 @@ so we do not grow a citeproc, a full BibTeX parser, or a holdings search.
             `guionly` fields, licences classified (CC0 / CC BY / … / custom),
             `Policy(accept, allow, deny, restricted)`, credit line per record
             in the site-policy format; docs/japan-search.md.
-      - [ ] Wire into `search(sources=(..., "jpsearch"))`, keeping licence and
-            attribution on the result (Book has no field for them yet).
+      - [x] Wire into `search(sources=(..., "jpsearch"))`, keeping licence and
+            attribution on the result — new optional `Book.licence` /
+            `Book.attribution` (only in `to_dict()` when set),
+            `jpsearch_policy`, `on_skip`; opt-in, default sources unchanged.
       - [ ] CLI (`hondana search --source jpsearch`, credit lines in output).
       - [ ] `lookup()`: keyword search on an ISBN is fuzzy, so only if an exact
             route exists (check the SPARQL endpoint first); otherwise document

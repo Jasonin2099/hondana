@@ -294,3 +294,79 @@ def test_kind_and_limit_and_raw():
     assert "f-type" not in searches[0] and searches[0]["size"] == 1
     js.search("猫", limit=1000)
     assert [p for u, p in calls if "/item/" in u][-1]["size"] == 100
+
+
+# --- search(sources=(..., "jpsearch")) ---------------------------------------
+
+from hondana import Book, search  # noqa: E402
+
+
+def test_search_source_keeps_licence_and_attribution():
+    skipped = []
+    books = search("猫", sources=("jpsearch",), fetch=fake(), limit=10,
+                   on_skip=lambda d, r: skipped.append(d))
+    by_title = {b.title: b for b in books}
+    assert set(by_title) == {"吾輩は猫である", "猫の本"}
+    cat = by_title["吾輩は猫である"]
+    assert cat.source == "Japan Search"
+    assert cat.isbn == "9784003101018"
+    assert cat.licence == "cc-by"
+    assert cat.attribution.startswith("出典：ジャパンサーチ「全国書誌（国立図書館）」")
+    zero = by_title["猫の本"]
+    assert zero.licence == "cc0" and "/item/zero-1" in zero.attribution
+    assert set(skipped) == {"nc", "own", "noway", "closed", "part", "caveat", "unknown"}
+    d = cat.to_dict()
+    assert d["licence"] == "cc-by" and d["attribution"] == cat.attribution
+
+
+def test_search_source_policy_is_passed_through():
+    books = search("猫", sources=("jpsearch",), fetch=fake(), limit=10,
+                   jpsearch_policy=Policy(restricted=True, allow=frozenset({"own"})))
+    titles = {b.title for b in books}
+    assert {"一部制限の猫", "独自規約の猫"} <= titles
+    part = next(b for b in books if b.title == "一部制限の猫")
+    assert part.author == ""  # contributor is guionly in that database
+
+
+def test_search_source_is_opt_in_and_other_books_unchanged():
+    calls = []
+    search("猫", fetch=fake(calls), limit=3)
+    assert not any("jpsearch.go.jp" in u for u, _ in calls)
+    d = Book("9784003101018", "吾輩は猫である").to_dict()
+    assert "licence" not in d and "attribution" not in d
+
+
+def test_search_source_earlier_source_wins_same_isbn():
+    ndl = (200, """<?xml version="1.0"?><rss><channel><item><title>吾輩は猫である</title>
+<dc:creator>夏目漱石</dc:creator><dc:identifier xsi:type="dcndl:ISBN">978-4-00-310101-8</dc:identifier>
+</item></channel></rss>""")
+    routes = {
+        "/database/search": (200, json.dumps(DATABASES)),
+        "/organization/search": (200, json.dumps(ORGS)),
+        "/item/search/jps-cross": (200, json.dumps(SEARCH)),
+    }
+    jp = fake(routes=routes)
+
+    def fetch(url, params, timeout):
+        return ndl if "ndlsearch" in url else jp(url, params, timeout)
+
+    books = search("吾輩は猫である", sources=("ndl", "jpsearch"), fetch=fetch, limit=10)
+    same = [b for b in books if b.isbn == "9784003101018"]
+    assert len(same) == 1 and same[0].source == "NDL" and same[0].attribution == ""
+
+
+def test_search_source_errors_and_raw_and_timeouts():
+    errors = []
+    books = search("猫", sources=("jpsearch",), fetch=fake(routes={}), on_error=lambda n, e: errors.append(n))
+    assert books == [] and errors == ["jpsearch"]
+    seen = []
+
+    def slow(url, params, timeout):
+        seen.append(timeout)
+        return fake()(url, params, timeout)
+
+    books = search("猫", sources=("jpsearch",), fetch=slow, raw=True, timeouts={"jpsearch": 3})
+    assert seen and set(seen) == {3}
+    assert all(b.raw and json.loads(b.raw)["common"]["title"] == b.title for b in books)
+    with pytest.raises(ValueError):
+        search("猫", sources=("jpsearch", "nope"), fetch=fake())

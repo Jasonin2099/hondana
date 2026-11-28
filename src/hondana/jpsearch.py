@@ -274,7 +274,12 @@ class Record:
         return f"{SITE}/item/{self.id}"
 
     def to_book(self) -> Book:
-        return Book(self.isbn, self.title, self.author, self.publisher, self.year, "", "Japan Search")
+        """As a :class:`hondana.Book` (``source="Japan Search"``), keeping
+        ``licence`` and ``attribution``."""
+        return Book(
+            self.isbn, self.title, self.author, self.publisher, self.year, "", "Japan Search",
+            licence=self.licence, attribution=self.attribution,
+        )
 
 
 def _year(values: Iterable[Any]) -> str:

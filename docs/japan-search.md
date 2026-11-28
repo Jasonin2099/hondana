@@ -7,8 +7,9 @@ no key and returns JSON. `hondana.jpsearch` is a small client for it that
 **applies each database's own terms before you see a record**.
 
 Status: the client, the terms handling and the attribution model are in
-(`hondana.jpsearch`). Wiring it into `search()` / the CLI is the next step
-(ROADMAP, Batch 4).
+(`hondana.jpsearch`), and `search(sources=(..., "jpsearch"))` uses it (opt-in;
+the default sources are unchanged). The CLI flag is the next step (ROADMAP,
+Batch 4).
 
 ## What the terms say
 
@@ -91,6 +92,43 @@ assert r.attribution == "出典：ジャパンサーチ「全国書誌（国立�
 assert len(records) == 1 and js.skipped == {"closed": "API use not allowed (apiType=ng)"}
 book = r.to_book()  # a hondana Book, source "Japan Search"
 ```
+
+## From `search()`
+
+Add `"jpsearch"` to `sources`. Its books keep `licence` and `attribution`
+(both empty for the other sources, and left out of `to_dict()` then), so the
+credit line travels with the record. `jpsearch_policy` takes a `Policy`,
+`on_skip` reports the databases left out. When an earlier source already
+returned the same book (same ISBN, or same folded title and author), that
+copy is kept — put `"jpsearch"` first if you prefer its records.
+
+```python
+import json
+from hondana import search
+
+def stub(url, params, timeout):
+    if url.endswith("/database/search"):
+        return 200, json.dumps({"list": [
+            {"id": "zero", "name": {"ja": "ゼロ文庫"}, "provider": "ゼロ図書館", "apiType": "ok"},
+            {"id": "nc", "name": {"ja": "非営利DB"}, "apiType": "ok", "metadataRights": {"ja": "CC BY-NC"}},
+        ]})
+    if url.endswith("/item/search/jps-cross"):
+        return 200, json.dumps({"list": [
+            {"id": "zero-7", "common": {"id": "zero-7", "database": "zero", "title": "猫の本", "temporal": ["1935"]}},
+            {"id": "nc-1", "common": {"id": "nc-1", "database": "nc", "title": "猫の図鑑"}},
+        ]})
+    return 404, ""
+
+skipped = {}
+books = search("猫", sources=("jpsearch",), fetch=stub, on_skip=skipped.__setitem__)
+b = books[0]
+assert (b.title, b.source, b.licence) == ("猫の本", "Japan Search", "cc0")
+assert b.attribution == "出典：ジャパンサーチ「ゼロ文庫（ゼロ図書館）」のメタデータ（https://jpsearch.go.jp/item/zero-7）"
+assert len(books) == 1 and skipped == {"nc": "licence cc-by-nc not in Policy.accept"}
+```
+
+Exports (`to_bibtex` / `to_ris` / `to_csl`) do not carry the credit line yet;
+keep `book.attribution` next to anything you publish.
 
 To use a CC BY-SA database, or one with its own terms, after reading them:
 

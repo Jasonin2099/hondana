@@ -6,7 +6,8 @@ Each source is tried on its own; one timing out never skips the rest.
 ``lookup(..., merge=True)`` queries every source and fills missing fields;
 ``lookup_many()`` batches ISBNs with an optional ``rate`` limit.
 ``search()`` looks up a title or author (no ISBN) via NDL Search and
-Open Library, and ranks hits with ``fold()``. No third-party dependencies
+Open Library (Japan Search on request: ``sources=(..., "jpsearch")``,
+see :mod:`hondana.jpsearch`), and ranks hits with ``fold()``. No third-party dependencies
 — pass your own ``fetch`` to use httpx/requests, add caching, or stub
 the network in tests.
 """
@@ -100,6 +101,12 @@ class Book:
     ndc: str = ""
     #: The source's response body, only filled in by ``lookup(..., raw=True)``.
     raw: Optional[str] = field(default=None, repr=False, compare=False)
+    #: Licence of the metadata when the source states one per record
+    #: (Japan Search: ``cc0``, ``cc-by``, …); empty for the other sources.
+    licence: str = ""
+    #: Credit line to show with this record when the source asks for one
+    #: (Japan Search, see :func:`hondana.jpsearch.attribution`).
+    attribution: str = ""
 
     def __bool__(self) -> bool:
         return bool(self.title)
@@ -118,10 +125,13 @@ class Book:
         """Fields as a dict. When ``ccode`` decodes, ``ccode_labels`` holds the
         audience / form / subject / detail labels; when ``ndc`` parses,
         ``ndc_class`` holds its main class and labels (neither is part of the
-        dataclass)."""
+        dataclass). ``licence`` and ``attribution`` appear only when set."""
         d: Dict[str, Any] = asdict(self)
         if d["raw"] is None:
             del d["raw"]
+        for k in ("licence", "attribution"):
+            if not d[k]:
+                del d[k]
         info = self.ccode_info
         if info is not None:
             d["ccode_labels"] = {k: v for k, v in info._asdict().items() if k != "code"}
@@ -506,6 +516,23 @@ def _ol_search(query: str, title: str, author: str, fetch: Fetch, limit: int) ->
     return out
 
 
+def _jpsearch_source(policy: Any, on_skip: Optional[Callable[[str, str], None]], raw: bool) -> Any:
+    """``search()`` source for Japan Search (imported lazily: optional)."""
+    from .jpsearch import JapanSearch, Policy
+
+    def run(query: str, title: str, author: str, fetch: Fetch, limit: int) -> "list[Book]":
+        client = JapanSearch(fetch, policy if policy is not None else Policy(), on_skip=on_skip)
+        out = []
+        for rec in client.search(query, title=title, author=author, limit=limit, raw=raw):
+            b = rec.to_book()
+            if raw and rec.raw is not None:
+                b.raw = json.dumps(rec.raw, ensure_ascii=False)
+            out.append(b)
+        return out
+
+    return run
+
+
 _SEARCH_SOURCES: dict[str, Any] = {"ndl": _ndl_search, "openlibrary": _ol_search}
 DEFAULT_SEARCH_SOURCES = ("ndl", "openlibrary")
 
@@ -552,6 +579,8 @@ def search(
     timeouts: Optional["dict[str, float]"] = None,
     on_error: Optional[Callable[[str, BaseException], None]] = None,
     raw: bool = False,
+    jpsearch_policy: Optional[Any] = None,
+    on_skip: Optional[Callable[[str, str], None]] = None,
 ) -> "list[Book]":
     """Search by title or author, without an ISBN.
 
@@ -561,19 +590,30 @@ def search(
     or ``author``. ``limit`` caps the result list (per source, then again
     after merging). ``fetch``, ``timeouts``, ``on_error`` and ``raw``
     behave as in :func:`lookup`.
+
+    ``"jpsearch"`` (Japan Search) is an opt-in source:
+    ``sources=("ndl", "openlibrary", "jpsearch")``. Each database's terms
+    are applied first (see :mod:`hondana.jpsearch`; ``jpsearch_policy`` is a
+    :class:`hondana.jpsearch.Policy`, default ``Policy()``), and its books
+    carry ``licence`` and ``attribution`` — show the credit line wherever
+    you show the record. ``on_skip(database_id, reason)`` reports the Japan
+    Search databases left out. A book found by an earlier source (same
+    ISBN or same folded title + author) is kept from that source.
     """
     query, title, author = (query or "").strip(), (title or "").strip(), (author or "").strip()
     if not (query or title or author):
         raise ValueError("search needs a query, title or author")
-    unknown = set(timeouts or ()) - set(_SEARCH_SOURCES)
+    sources = tuple(sources)
+    unknown = set(timeouts or ()) - set(_SEARCH_SOURCES) - {"jpsearch"}
     if unknown:
         raise ValueError(f"unknown source(s) in timeouts: {', '.join(sorted(unknown))}")
     found: list[Book] = []
     seen: set[tuple[str, ...]] = set()
     for name in sources:
-        fn = _SEARCH_SOURCES.get(name)
-        if fn is None:
+        if name not in _SEARCH_SOURCES and name != "jpsearch":
             raise ValueError(f"unknown search source: {name}")
+    for name in sources:
+        fn = _SEARCH_SOURCES.get(name) or _jpsearch_source(jpsearch_policy, on_skip, raw)
         f = fetch if not timeouts or name not in timeouts else _with_timeout(fetch, timeouts[name])
         last: list[str] = []
         if raw:
