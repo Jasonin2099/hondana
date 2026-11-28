@@ -8,7 +8,7 @@ from .lookup import Book, cached, lookup, lookup_many, search
 from .dedupe import DuplicateGroup, DedupeResult, dedupe, dedupe_key
 from .reimport import from_bibtex, from_csl, from_ris, loads
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = [
     "fold", "fold_steps", "kata_to_hira", "hira_to_kata", "to_shinjitai", "width", "strip_reading_lines",
     "is_valid", "to_isbn13", "to_isbn10", "find_isbns", "hyphenate", "registration_group",
